@@ -1,6 +1,7 @@
 import { createEffect, createSignal } from "solid-js"
 import { Schema } from "effect"
-import { Command, Plugin, SettingsPage, Slot, Store } from "@opencode/plugin/gui"
+import { Command, MenuItem, Panel, Plugin, Slot, Store } from "@opencode/plugin/gui"
+import type { PanelTab } from "@opencode/plugin/gui"
 import { GoUsage, type GoModel, type GoModels, type UsageSnapshot } from "./rpc.ts"
 import type { ConsoleLimits, Prefs, SessionStats, StatsBundle } from "./gui/types.ts"
 import { loadStatsBundle } from "./gui/stats.ts"
@@ -9,7 +10,8 @@ import { formatMoney, formatPercent, formatTokens, sumTokens } from "./gui/forma
 import { UsageBadge } from "./gui/badge.tsx"
 import { UsagePage } from "./gui/page.tsx"
 
-const PAGE_ID = "opencode-go-usage"
+const PANEL_ID = "usage"
+const PANEL_KEY = "opencode-go-usage:usage"
 const TICK = 5_000
 const STATS_INTERVAL = 60_000
 const MODELS_INTERVAL = 10 * 60_000
@@ -213,7 +215,17 @@ export default Plugin.define({
       copyTimer = setTimeout(() => setCopyState("idle"), 1_600)
     }
 
-    const open = () => ctx.layout.settings(PAGE_ID)
+    const open = () => {
+      const session = ctx.sessions.current()
+      if (!session) {
+        ctx.toast.show({
+          title: "先打开一个会话",
+          description: "Go 用量面板显示在会话右侧",
+        })
+        return
+      }
+      ctx.layout.open(PANEL_KEY, session)
+    }
     const openConsole = () => void ctx.system.openExternal("https://opencode.ai/console")
     const openDocs = () => void ctx.system.openExternal("https://opencode.ai/v2/docs/console/go/")
 
@@ -275,21 +287,25 @@ export default Plugin.define({
       render: () => <UsageBadge value={usage} onOpen={open} />,
     })
 
-    ctx.add(SettingsPage, {
-      id: PAGE_ID,
-      icon: "window-analytics",
-      get title() {
-        return "OpenCode Go"
+    const panelTab: PanelTab = {
+      id: PANEL_ID,
+      title: "OpenCode Go 用量",
+      label: () => "Go 用量",
+      pinned: true,
+      closable: false,
+    }
+
+    ctx.add(Panel, {
+      id: PANEL_ID,
+      region: "side",
+      wide: true,
+      mobile: {
+        title: "Go 用量",
+        order: 40,
+        kind: "tab",
+        icon: "window-analytics",
       },
-      get entries() {
-        return [
-          { id: "overview", title: "额度总览", keywords: "go usage quota 额度" },
-          { id: "today", title: "今日概览", keywords: "today tokens steps 今日" },
-          { id: "trend", title: "使用趋势", keywords: "trend 7 days 30 days 趋势" },
-          { id: "models", title: "按模型用量", keywords: "models cost 模型 估算" },
-          { id: "health", title: "工具与会话", keywords: "tools health 工具 会话" },
-        ]
-      },
+      list: () => [panelTab],
       render: () => (
         <UsagePage
           usage={usage}
@@ -309,6 +325,14 @@ export default Plugin.define({
           onCopy={copySummary}
         />
       ),
+    })
+
+    ctx.add(MenuItem, {
+      menu: "session.panel",
+      id: PANEL_ID,
+      title: "Go 用量",
+      icon: "window-analytics",
+      run: open,
     })
 
     ctx.add(Command, () => ({

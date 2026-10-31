@@ -63,7 +63,10 @@ OpenCode Desktop reads plugins from `opencode.jsonc`, not `cli.json`. Save the f
 | Where | What you see |
 | --- | --- |
 | Session title row | `Go 5h 2% · 周 2% · 月 1%` |
-| Settings / Command palette | Dashboard with quota windows, trends, model breakdown, and health |
+| Session right sidebar | Dashboard with quota windows, trends, model breakdown, and health |
+| Command palette / `+` menu | Open the dashboard panel |
+
+Click the badge in the session title row, or run **View OpenCode Go usage** from the command palette, to open the panel on the right side of the session. The panel stays pinned there; close the side region to hide it without losing the tab.
 
 The dashboard combines two sources: the official OpenCode Go usage API for the three allowance percentages, and local OpenCode session statistics for everything else. The local numbers cover only this machine; other devices and clients are not included. Dollar amounts are estimates at public base prices and are not a substitute for the Console bill.
 
@@ -103,7 +106,7 @@ Project layout:
 ```text
 index.ts                  Server part: credential, usage cache, 24h sampling, model prices, RPC
 src/rpc.ts                RPC contract shared by server and GUI
-src/gui.tsx               Window part: polling, stores, slot, settings page, command
+src/gui.tsx               Window part: polling, stores, slot, side panel, command
 src/gui/page.tsx          Dashboard layout: status, quota cards, today overview
 src/gui/sections.tsx      Trends, model breakdown, health, Console budgets, notes
 src/gui/charts.tsx        Sparkline, bar chart, stat tile, section helpers

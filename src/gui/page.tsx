@@ -32,7 +32,7 @@ function MeterCard(props: {
   }
 
   return (
-    <div style="border:1px solid rgba(127,127,127,0.2);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0;">
+    <div style="border:1px solid rgba(127,127,127,0.2);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px;min-width:0;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
         <div style="min-width:0;">
           <div style="font-size:13px;font-weight:600;">{props.label}</div>
@@ -110,11 +110,11 @@ export function UsagePage(props: {
   const selectStyle = "height:30px;box-sizing:border-box;padding:0 8px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;max-width:180px;flex-shrink:0;"
 
   return (
-    <div style="padding:24px;max-width:900px;display:flex;flex-direction:column;gap:20px;">
-      <div style="border:1px solid rgba(127,127,127,0.2);border-radius:12px;background:rgba(127,127,127,0.03);padding:16px;display:flex;flex-direction:column;gap:10px;">
+    <div style="padding:14px;max-width:100%;min-width:0;display:flex;flex-direction:column;gap:14px;">
+      <div style="border:1px solid rgba(127,127,127,0.2);border-radius:12px;background:rgba(127,127,127,0.03);padding:12px;display:flex;flex-direction:column;gap:10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
           <div>
-            <div style="font-size:20px;font-weight:650;">OpenCode Go 用量</div>
+            <div style="font-size:16px;font-weight:650;">OpenCode Go 用量</div>
             <div style="margin-top:4px;font-size:11px;opacity:0.55;">
               官方额度 + 本机 OpenCode 统计 · 每 {Math.round(props.prefs.value.interval / 1000)} 秒自动刷新
             </div>
@@ -191,7 +191,7 @@ export function UsagePage(props: {
       </Show>
 
       <Show when={connected()}>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
           <MeterCard
             label="5 小时窗口"
             hint="滚动窗口"
