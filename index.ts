@@ -3,7 +3,7 @@ import { Plugin } from "@opencode/plugin"
 import { GoUsage } from "./src/rpc.ts"
 
 const ENDPOINT = "https://opencode.ai/zen/go/v1/usage"
-const CACHE_TTL = 60_000
+const CACHE_TTL = 15_000
 
 type RawMeter = {
   status?: string

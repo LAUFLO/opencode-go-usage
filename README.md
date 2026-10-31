@@ -10,7 +10,7 @@ A desktop plugin for [OpenCode](https://opencode.ai) that shows your **OpenCode 
 - **Titlebar pill** — `Go 月 1%` in the window titlebar; click it to open the detail page.
 - **Detail page** — three progress bars for the rolling 5-hour, weekly, and monthly windows, each with its reset time.
 - **Command palette** — run `查看 OpenCode Go 用量` to jump to the detail page.
-- **Live updates** — refreshes every 60 seconds; the server caches for 60 seconds and supports manual refresh.
+- **Live updates** — refreshes every 10 seconds; the server caches for 15 seconds and supports manual refresh.
 - **No secrets in files** — the plugin reads the OpenCode Go credential already stored by OpenCode and never writes the API key anywhere.
 
 ## Requirements
@@ -124,7 +124,7 @@ MIT
 - **窗口顶栏**：显示 `Go 月 1%`，点击打开详情页
 - **详情页**：5 小时窗口、本周、本月三条进度条，带重置时间
 - **命令面板**：搜索「查看 OpenCode Go 用量」
-- **自动刷新**：每 60 秒一次，服务端缓存 60 秒，支持手动刷新
+- **自动刷新**：每 10 秒一次，服务端缓存 15 秒，支持手动刷新
 - **密钥安全**：直接复用 OpenCode 中已连接的 OpenCode Go 凭据，密钥不写入任何文件
 
 安装：把仓库 clone 到 `~/.config/opencode/plugins/opencode-go-usage`（Windows 为 `%USERPROFILE%\.config\opencode\plugins\opencode-go-usage`），执行 `npm install --omit=dev`，然后在全局 `opencode.jsonc` 的 `plugins` 中加入 `"./plugins/opencode-go-usage"`。

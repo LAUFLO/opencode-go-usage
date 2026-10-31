@@ -4,7 +4,7 @@ import { GoUsage, type UsageSnapshot } from "./rpc.ts"
 import { UsageBadge, UsagePage } from "./gui/page"
 
 const PAGE_ID = "opencode-go-usage"
-const REFRESH_MS = 60_000
+const REFRESH_MS = 10_000
 
 export default Plugin.define({
   setup(ctx) {
