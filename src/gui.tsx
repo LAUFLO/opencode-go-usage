@@ -1,47 +1,216 @@
-import { createSignal } from "solid-js"
-import { Command, Plugin, SettingsPage, Slot } from "@opencode/plugin/gui"
-import { GoUsage, type UsageSnapshot } from "./rpc.ts"
-import { UsageBadge, UsagePage } from "./gui/page"
+import { createEffect, createSignal } from "solid-js"
+import { Schema } from "effect"
+import { Command, Plugin, SettingsPage, Slot, Store } from "@opencode/plugin/gui"
+import { GoUsage, type GoModel, type GoModels, type UsageSnapshot } from "./rpc.ts"
+import type { ConsoleLimits, Prefs, SessionStats, StatsBundle } from "./gui/types.ts"
+import { loadStatsBundle } from "./gui/stats.ts"
+import { estimateCost } from "./gui/model-table.tsx"
+import { formatMoney, formatPercent, formatTokens, sumTokens } from "./gui/format.ts"
+import { UsageBadge } from "./gui/badge.tsx"
+import { UsagePage } from "./gui/page.tsx"
 
 const PAGE_ID = "opencode-go-usage"
-const REFRESH_MS = 10_000
+const TICK = 5_000
+const STATS_INTERVAL = 60_000
+const MODELS_INTERVAL = 10 * 60_000
+const LIMITS_INTERVAL = 60_000
+
+const PrefsSchema = Schema.Struct({
+  interval: Schema.Number,
+  scope: Schema.Literals(["all", "current"]),
+  modelScope: Schema.Literals(["go", "all"]),
+  modelRange: Schema.Literals(["week", "month"]),
+  showCost: Schema.Boolean,
+})
+
+const initialPrefs: Prefs = {
+  interval: 10_000,
+  scope: "all",
+  modelScope: "go",
+  modelRange: "week",
+  showCost: true,
+}
 
 export default Plugin.define({
+  stores: {
+    prefs: Store.global(PrefsSchema, initialPrefs),
+  },
   setup(ctx) {
-    const [value, setValue] = createSignal<UsageSnapshot | undefined>()
+    const prefs = ctx.stores.prefs
+    const [usage, setUsage] = createSignal<UsageSnapshot | undefined>()
+    const [models, setModels] = createSignal<GoModel[]>([])
+    const [stats, setStats] = createSignal<StatsBundle | undefined>()
+    const [limits, setLimits] = createSignal<ConsoleLimits | undefined>()
     const [loading, setLoading] = createSignal(false)
     const [error, setError] = createSignal<string | undefined>()
+    const [statsError, setStatsError] = createSignal<string | undefined>()
+    const [modelsError, setModelsError] = createSignal<string | undefined>()
 
+    const statsCache = new Map<string, SessionStats>()
     let disposed = false
+    let usageLoading = false
+    let statsLoading = false
+    let statsAgain = false
 
-    const load = async (refresh = false) => {
-      if (loading()) return
+    const currentProject = () => {
+      const session = ctx.sessions.current()
+      return (session?.project as { id?: string } | undefined)?.id
+    }
+    const projectFilter = () => (prefs.value.scope === "current" ? currentProject() : undefined)
+
+    const loadUsage = async (refresh = false) => {
+      if (usageLoading) return
+      usageLoading = true
       setLoading(true)
       try {
         const result = (await ctx.client.rpc(GoUsage).get({ refresh })) as UsageSnapshot
         if (disposed) return
-        setValue(result)
+        setUsage(result)
         setError(undefined)
       } catch (cause) {
-        if (disposed) return
-        setError(`无法读取 OpenCode Go 用量：${String(cause)}`)
+        if (!disposed) setError(`无法读取 OpenCode Go 用量：${String(cause)}`)
       } finally {
+        usageLoading = false
         if (!disposed) setLoading(false)
       }
     }
 
-    void load()
-    const timer = setInterval(() => void load(), REFRESH_MS)
-    const retry = setTimeout(() => {
-      if (!value()) void load()
-    }, 3_000)
+    const loadModels = async (refresh = false) => {
+      try {
+        const result = (await ctx.client.rpc(GoUsage).models({ refresh })) as GoModels
+        if (disposed) return
+        setModels(result.models)
+        setModelsError(result.error)
+      } catch (cause) {
+        if (!disposed) setModelsError(`无法读取 Go 模型价格：${String(cause)}`)
+      }
+    }
+
+    const loadStats = async () => {
+      if (statsLoading) {
+        statsAgain = true
+        return
+      }
+      statsLoading = true
+      try {
+        const result = await loadStatsBundle(ctx.client as never, {
+          project: projectFilter(),
+          cache: statsCache,
+        })
+        if (disposed) return
+        setStats(result)
+        setStatsError(undefined)
+      } catch (cause) {
+        if (!disposed) setStatsError(`无法读取本机使用统计：${String(cause)}`)
+      } finally {
+        statsLoading = false
+        if (!disposed && statsAgain) {
+          statsAgain = false
+          void loadStats()
+        }
+      }
+    }
+
+    const loadLimits = async () => {
+      try {
+        const result = await (ctx.client as unknown as {
+          usage: { limits(): Promise<unknown> }
+        }).usage.limits()
+        if (!disposed) setLimits((result ?? null) as ConsoleLimits)
+      } catch {
+        if (!disposed) setLimits(undefined)
+      }
+    }
+
+    const refreshAll = () => {
+      void loadUsage(true)
+      void loadStats()
+      void loadModels(true)
+      void loadLimits()
+    }
+
+    const estimatedToday = () => {
+      const today = stats()?.today
+      if (!today) return 0
+      const catalog = new Map(models().map((model) => [model.id, model]))
+      return today.models
+        .filter((item) => item.model.providerID === "opencode-go")
+        .reduce((sum, item) => sum + (estimateCost(catalog.get(item.model.id), item.tokens) ?? 0), 0)
+    }
+
+    const copySummary = () => {
+      const value = usage()
+      const today = stats()?.today
+      const lines = [
+        `OpenCode Go 用量 · ${new Date().toLocaleString("zh-CN")}`,
+        value?.connected
+          ? `5h ${formatPercent(value.rolling?.percent)} · 周 ${formatPercent(value.weekly?.percent)} · 月 ${formatPercent(value.monthly?.percent)}`
+          : "未连接 OpenCode Go",
+      ]
+      if (today) lines.push(`今日 ${today.steps} steps · ${formatTokens(sumTokens(today.tokens))} tokens`)
+      if (estimatedToday() > 0) lines.push(`今日估算 ${formatMoney(estimatedToday())}`)
+      void ctx.system.copy(lines.join("\n"))
+    }
 
     const open = () => ctx.layout.settings(PAGE_ID)
+    const openConsole = () => void ctx.system.openExternal("https://opencode.ai/console")
+    const openDocs = () => void ctx.system.openExternal("https://opencode.ai/v2/docs/console/go/")
+
+    const prefsStore = {
+      get value() {
+        return prefs.value
+      },
+      update(mutate: (draft: Prefs) => void) {
+        prefs.update((draft) => {
+          mutate(draft)
+          return undefined
+        })
+      },
+    }
+
+    void loadUsage()
+    void loadModels(false)
+    void loadStats()
+    void loadLimits()
+
+    let lastUsage = Date.now()
+    let lastStats = Date.now()
+    let lastModels = Date.now()
+    let lastLimits = Date.now()
+
+    let lastScope = `${prefs.value.scope}:${currentProject() ?? "all"}`
+    createEffect(() => {
+      const key = `${prefs.value.scope}:${currentProject() ?? "all"}`
+      if (key === lastScope) return
+      lastScope = key
+      statsCache.clear()
+      void loadStats()
+    })
+
+    const timer = setInterval(() => {
+      const now = Date.now()
+      if (now - lastUsage >= prefs.value.interval) {
+        lastUsage = now
+        void loadUsage()
+      }
+      if (now - lastStats >= STATS_INTERVAL) {
+        lastStats = now
+        void loadStats()
+      }
+      if (now - lastModels >= MODELS_INTERVAL) {
+        lastModels = now
+        void loadModels()
+      }
+      if (now - lastLimits >= LIMITS_INTERVAL) {
+        lastLimits = now
+        void loadLimits()
+      }
+    }, TICK)
 
     ctx.add(Slot, {
       at: "session.header",
       order: 40,
-      render: () => <UsageBadge value={value} onOpen={open} />,
+      render: () => <UsageBadge value={usage} onOpen={open} />,
     })
 
     ctx.add(SettingsPage, {
@@ -51,15 +220,30 @@ export default Plugin.define({
         return "OpenCode Go"
       },
       get entries() {
-        return [{ id: "overview", title: "OpenCode Go 用量", keywords: "go 额度 usage quota 用量" }]
+        return [
+          { id: "overview", title: "额度总览", keywords: "go usage quota 额度" },
+          { id: "today", title: "今日概览", keywords: "today tokens steps 今日" },
+          { id: "trend", title: "使用趋势", keywords: "trend 7 days 30 days 趋势" },
+          { id: "models", title: "按模型用量", keywords: "models cost 模型 估算" },
+          { id: "health", title: "工具与会话", keywords: "tools health 工具 会话" },
+        ]
       },
       render: () => (
         <UsagePage
-          value={value}
+          usage={usage}
+          models={models}
+          stats={stats}
+          limits={limits}
           loading={loading}
           error={error}
-          onRefresh={() => void load(true)}
-          onOpenConsole={() => ctx.system.openExternal("https://opencode.ai/console")}
+          statsError={statsError}
+          modelsError={modelsError}
+          prefs={prefsStore}
+          currentProject={currentProject}
+          onRefresh={refreshAll}
+          onOpenConsole={openConsole}
+          onOpenDocs={openDocs}
+          onCopy={copySummary}
         />
       ),
     })
@@ -75,7 +259,6 @@ export default Plugin.define({
     return () => {
       disposed = true
       clearInterval(timer)
-      clearTimeout(retry)
     }
   },
 })

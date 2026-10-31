@@ -1,155 +1,243 @@
-import type { Accessor } from "solid-js"
-import type { Meter, UsageSnapshot } from "../rpc.ts"
+import { Show, createMemo, type Accessor } from "solid-js"
+import type { GoModel, Meter, UsageSnapshot } from "../rpc.ts"
+import type { ConsoleLimits, Prefs, StatsBundle } from "./types"
+import { Sparkline } from "./charts"
+import { estimateCost } from "./model-table"
+import { ConsoleSection, DataNotes, HealthSection, ModelSection, TodaySection, TrendSection } from "./sections"
+import {
+  clamp,
+  formatClock,
+  formatMoney,
+  formatPercent,
+  formatReset,
+  tone,
+} from "./format"
 
-const OK = "#22c55e"
-const WARN = "#f59e0b"
-const DANGER = "#ef4444"
-
-function tone(percent: number) {
-  if (percent >= 90) return DANGER
-  if (percent >= 70) return WARN
-  return OK
+type PrefsStore = {
+  readonly value: Prefs
+  update(mutate: (draft: Prefs) => void): void
 }
 
-function clamp(percent: number | undefined) {
-  if (typeof percent !== "number" || !Number.isFinite(percent)) return 0
-  return Math.max(0, Math.min(100, percent))
-}
-
-function formatTime(timestamp: number | undefined) {
-  if (!timestamp) return "未知"
-  return new Date(timestamp).toLocaleTimeString("zh-CN", {
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  })
-}
-
-function formatReset(timestamp: number | undefined) {
-  if (!timestamp) return "未知时间"
-  const date = new Date(timestamp)
-  const absolute = date.toLocaleString("zh-CN", {
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-  const diff = timestamp - Date.now()
-  if (diff <= 0) return absolute
-  const minutes = Math.floor(diff / 60_000)
-  if (minutes < 60) return `${absolute}（${minutes} 分钟后）`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${absolute}（${hours} 小时后）`
-  return `${absolute}（${Math.floor(hours / 24)} 天后）`
-}
-
-function MeterCard(props: { label: string; hint: string; meter?: Meter }) {
+function MeterCard(props: {
+  label: string
+  hint: string
+  rule: string
+  meter?: Meter
+  points: number[]
+  trend: string
+}) {
   const percent = () => clamp(props.meter?.percent)
+  const remaining = () => 100 - percent()
+
   return (
-    <div style="border:1px solid rgba(127,127,127,0.2);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;">
-        <span style="font-size:13px;font-weight:500;">{props.label}</span>
-        <strong style={`font-size:18px;color:${tone(percent())};`}>{percent().toFixed(0)}%</strong>
+    <div style="border:1px solid rgba(127,127,127,0.2);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;min-width:0;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+        <div style="min-width:0;">
+          <div style="font-size:13px;font-weight:600;">{props.label}</div>
+          <div style="font-size:10px;opacity:0.5;margin-top:2px;">{props.hint}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style={`font-size:24px;font-weight:650;line-height:1;color:${tone(percent())};`}>
+            {percent().toFixed(0)}%
+          </div>
+          <div style="font-size:10px;opacity:0.5;margin-top:3px;">剩余 {remaining().toFixed(0)}%</div>
+        </div>
       </div>
-      <div style="height:8px;border-radius:999px;background:rgba(127,127,127,0.2);overflow:hidden;">
+
+      <div style="position:relative;height:8px;border-radius:999px;background:rgba(127,127,127,0.2);overflow:hidden;">
         <div
           style={`height:100%;width:${percent()}%;border-radius:999px;background:${tone(percent())};transition:width 0.3s ease;`}
         />
+        <div style="position:absolute;top:-2px;bottom:-2px;left:90%;width:1px;background:rgba(239,68,68,0.55);" />
       </div>
-      <div style="font-size:12px;opacity:0.6;">
-        {props.meter?.limited
-          ? "已触发限流，等待窗口重置。"
-          : `${props.hint} · ${formatReset(props.meter?.resetsAt)} 重置`}
+
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:10px;opacity:0.55;">
+        <span>{props.meter?.limited ? "已触发限流" : props.rule}</span>
+        <span>{props.trend}</span>
+      </div>
+
+      <Sparkline points={props.points} height={34} color={tone(percent())} />
+
+      <div style="font-size:10px;opacity:0.5;">
+        {formatReset(props.meter?.resetsAt)} 重置
       </div>
     </div>
   )
-}
-
-function buttonStyle(disabled: boolean) {
-  return `padding:6px 12px;border-radius:6px;border:1px solid rgba(127,127,127,0.35);background:transparent;color:inherit;cursor:${disabled ? "default" : "pointer"};font-size:13px;opacity:${disabled ? "0.5" : "1"};`
 }
 
 export function UsagePage(props: {
-  value: Accessor<UsageSnapshot | undefined>
+  usage: Accessor<UsageSnapshot | undefined>
+  models: Accessor<GoModel[]>
+  stats: Accessor<StatsBundle | undefined>
+  limits: Accessor<ConsoleLimits | undefined>
   loading: Accessor<boolean>
   error: Accessor<string | undefined>
+  statsError: Accessor<string | undefined>
+  modelsError: Accessor<string | undefined>
+  prefs: PrefsStore
+  currentProject: Accessor<string | undefined>
   onRefresh: () => void
   onOpenConsole: () => void
+  onOpenDocs: () => void
+  onCopy: () => void
 }) {
-  const message = () => props.error() ?? props.value()?.error
-  const ready = () => props.value()?.connected === true && !message()
-  const snapshot = () => props.value()
+  const connected = () => props.usage()?.connected === true
+  const catalog = createMemo(() => new Map(props.models().map((model) => [model.id, model])))
+  const estimated = () => {
+    const today = props.stats()?.today
+    if (!today) return 0
+    return today.models
+      .filter((item) => item.model.providerID === "opencode-go")
+      .reduce((sum, item) => sum + (estimateCost(catalog().get(item.model.id), item.tokens) ?? 0), 0)
+  }
+
+  const points = (key: "rolling" | "weekly" | "monthly") => {
+    const cutoff = Date.now() - 24 * 60 * 60_000
+    return (props.usage()?.history ?? []).filter((sample) => sample.at >= cutoff).map((sample) => sample[key])
+  }
+
+  const trend = (key: "rolling" | "weekly" | "monthly") => {
+    const values = points(key)
+    if (values.length < 2) return "24h 采样中"
+    const diff = values[values.length - 1] - values[0]
+    return `24h ${diff >= 0 ? "+" : ""}${diff.toFixed(0)}%`
+  }
+
+  const buttonStyle = "padding:6px 12px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;cursor:pointer;"
+  const selectStyle = "padding:5px 8px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;"
 
   return (
-    <div style="padding:24px;max-width:600px;display:flex;flex-direction:column;gap:16px;">
-      <div>
-        <div style="font-size:18px;font-weight:600;">OpenCode Go 用量</div>
-        <div style="margin-top:4px;font-size:12px;opacity:0.6;">
-          数据来自 opencode.ai，每 60 秒自动刷新一次。
-        </div>
-      </div>
-
-      {ready() ? (
-        <>
-          <MeterCard label="5 小时窗口" hint="滚动窗口" meter={snapshot()?.rolling} />
-          <MeterCard label="本周" hint="每周额度" meter={snapshot()?.weekly} />
-          <MeterCard label="本月" hint="每月额度" meter={snapshot()?.monthly} />
-        </>
-      ) : (
-        <div style="border:1px solid rgba(127,127,127,0.2);border-radius:10px;padding:14px 16px;font-size:13px;line-height:1.6;">
-          {message() ?? "正在读取 OpenCode Go 用量…"}
-          {props.value()?.connected === false ? (
-            <div style="margin-top:6px;font-size:12px;opacity:0.65;">
-              在 OpenCode 中运行 /connect，选择 OpenCode Go 并填入 API key 后即可显示额度。
+    <div style="padding:24px;max-width:900px;display:flex;flex-direction:column;gap:20px;">
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
+          <div>
+            <div style="font-size:20px;font-weight:650;">OpenCode Go 用量</div>
+            <div style="margin-top:4px;font-size:11px;opacity:0.55;">
+              官方额度 + 本机 OpenCode 统计 · 每 {Math.round(props.prefs.value.interval / 1000)} 秒自动刷新
             </div>
-          ) : null}
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <span
+              style={`display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;border:1px solid rgba(127,127,127,0.28);font-size:11px;`}
+            >
+              <span
+                style={`width:7px;height:7px;border-radius:999px;background:${connected() ? "#22c55e" : "#ef4444"};`}
+              />
+              {connected() ? "OpenCode Go 已连接" : "未连接 OpenCode Go"}
+            </span>
+            <Show when={props.usage()?.fetchedAt}>
+              <span style="font-size:10px;opacity:0.5;">
+                更新于 {formatClock(props.usage()?.fetchedAt)}
+                {props.usage()?.latencyMs !== undefined ? ` · ${props.usage()?.latencyMs}ms` : ""}
+              </span>
+            </Show>
+          </div>
         </div>
-      )}
 
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <button type="button" onClick={props.onRefresh} disabled={props.loading()} style={buttonStyle(props.loading())}>
-          {props.loading() ? "刷新中…" : "刷新"}
-        </button>
-        <button type="button" onClick={props.onOpenConsole} style={buttonStyle(false)}>
-          打开 OpenCode Console
-        </button>
-        <span style="font-size:12px;opacity:0.55;">更新于 {formatTime(snapshot()?.fetchedAt)}</span>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <button type="button" onClick={props.onRefresh} disabled={props.loading()} style={`${buttonStyle}opacity:${props.loading() ? "0.5" : "1"};`}>
+            {props.loading() ? "刷新中…" : "刷新"}
+          </button>
+          <select
+            value={String(props.prefs.value.interval)}
+            onChange={(event) => {
+              const value = Number(event.currentTarget.value)
+              props.prefs.update((draft) => { draft.interval = value })
+            }}
+            style={selectStyle}
+          >
+            <option value="10000">10 秒</option>
+            <option value="30000">30 秒</option>
+            <option value="60000">60 秒</option>
+          </select>
+          <select
+            value={props.prefs.value.scope}
+            onChange={(event) => {
+              const value = event.currentTarget.value as Prefs["scope"]
+              props.prefs.update((draft) => { draft.scope = value })
+            }}
+            style={selectStyle}
+            disabled={!props.currentProject()}
+            title={props.currentProject() ? undefined : "当前没有打开的项目会话"}
+          >
+            <option value="all">全部项目</option>
+            <option value="current">当前项目</option>
+          </select>
+          <button type="button" onClick={props.onCopy} style={buttonStyle}>
+            复制摘要
+          </button>
+          <button type="button" onClick={props.onOpenConsole} style={buttonStyle}>
+            打开 Console
+          </button>
+        </div>
       </div>
-    </div>
-  )
-}
 
-export function UsageBadge(props: {
-  value: Accessor<UsageSnapshot | undefined>
-  onOpen: () => void
-}) {
-  const snapshot = () => props.value()
-  return (
-    <>
-      {snapshot()?.connected ? (
-        <button
-          type="button"
-          onClick={props.onOpen}
-          title="查看 OpenCode Go 用量"
-          style="display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:11px;cursor:pointer;white-space:nowrap;"
-        >
-          <span style="font-weight:600;">Go</span>
-          <span style="opacity:0.6;">5h</span>
-          <span style={`color:${tone(clamp(snapshot()?.rolling?.percent))};`}>
-            {clamp(snapshot()?.rolling?.percent).toFixed(0)}%
-          </span>
-          <span style="opacity:0.35;">·</span>
-          <span style="opacity:0.6;">周</span>
-          <span style={`color:${tone(clamp(snapshot()?.weekly?.percent))};`}>
-            {clamp(snapshot()?.weekly?.percent).toFixed(0)}%
-          </span>
-          <span style="opacity:0.35;">·</span>
-          <span style="opacity:0.6;">月</span>
-          <span style={`color:${tone(clamp(snapshot()?.monthly?.percent))};`}>
-            {clamp(snapshot()?.monthly?.percent).toFixed(0)}%
-          </span>
-        </button>
-      ) : null}
-    </>
+      <Show when={props.error()}>
+        <div style="border:1px solid rgba(239,68,68,0.35);border-radius:9px;padding:10px 12px;font-size:12px;color:#ef4444;line-height:1.6;">
+          {props.error()}
+        </div>
+      </Show>
+
+      <Show when={props.usage() && !connected() && props.usage()?.error}>
+        <div style="border:1px solid rgba(127,127,127,0.2);border-radius:9px;padding:12px 14px;font-size:12px;line-height:1.7;">
+          {props.usage()?.error}
+          <div style="margin-top:6px;font-size:11px;opacity:0.6;">
+            在 OpenCode 中运行 /connect，选择 OpenCode Go 并填入 API key 后即可显示额度。
+          </div>
+        </div>
+      </Show>
+
+      <Show when={connected()}>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
+          <MeterCard
+            label="5 小时窗口"
+            hint="滚动窗口"
+            rule="官方：月度额度的 20%"
+            meter={props.usage()?.rolling}
+            points={points("rolling")}
+            trend={trend("rolling")}
+          />
+          <MeterCard
+            label="本周"
+            hint="每周额度"
+            rule="官方：月度额度的 50%"
+            meter={props.usage()?.weekly}
+            points={points("weekly")}
+            trend={trend("weekly")}
+          />
+          <MeterCard
+            label="本月"
+            hint="每月额度"
+            rule="官方：100%"
+            meter={props.usage()?.monthly}
+            points={points("monthly")}
+            trend={trend("monthly")}
+          />
+        </div>
+      </Show>
+
+      <Show when={props.stats()}>
+        <TodaySection
+          stats={props.stats}
+          models={props.models}
+          showCost={() => props.prefs.value.showCost}
+          estimated={estimated}
+        />
+        <TrendSection stats={props.stats} />
+        <ModelSection stats={props.stats} models={props.models} prefs={props.prefs} />
+        <HealthSection stats={props.stats} />
+      </Show>
+
+      <Show when={props.statsError()}>
+        <div style="font-size:11px;color:#ef4444;opacity:0.85;">{props.statsError()}</div>
+      </Show>
+      <Show when={props.modelsError()}>
+        <div style="font-size:11px;color:#ef4444;opacity:0.85;">{props.modelsError()}</div>
+      </Show>
+
+      <ConsoleSection limits={props.limits} onOpenConsole={props.onOpenConsole} />
+
+      <DataNotes onOpenDocs={props.onOpenDocs} />
+    </div>
   )
 }
