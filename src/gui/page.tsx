@@ -106,8 +106,8 @@ export function UsagePage(props: {
     return `24h ${diff >= 0 ? "+" : ""}${diff.toFixed(0)}%`
   }
 
-  const buttonStyle = "height:30px;box-sizing:border-box;padding:0 12px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;cursor:pointer;"
-  const selectStyle = "height:30px;box-sizing:border-box;padding:0 8px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;"
+  const buttonStyle = "height:30px;box-sizing:border-box;padding:0 12px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;"
+  const selectStyle = "height:30px;box-sizing:border-box;padding:0 8px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;max-width:180px;flex-shrink:0;"
 
   return (
     <div style="padding:24px;max-width:900px;display:flex;flex-direction:column;gap:20px;">
@@ -131,7 +131,7 @@ export function UsagePage(props: {
           </div>
         </div>
 
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto;">
           <button type="button" onClick={props.onRefresh} disabled={props.loading()} style={`${buttonStyle}opacity:${props.loading() ? "0.5" : "1"};`}>
             {props.loading() ? "刷新中…" : "刷新"}
           </button>
@@ -148,7 +148,7 @@ export function UsagePage(props: {
             <option value="60000">60 秒</option>
           </select>
           <label
-            style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;"
+            style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;white-space:nowrap;flex-shrink:0;"
             title="本地统计（今日、趋势、按模型）的范围；官方额度始终是整个账号的"
           >
             统计范围

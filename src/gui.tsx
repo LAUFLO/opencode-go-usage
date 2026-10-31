@@ -69,10 +69,12 @@ export default Plugin.define({
         if (!disposed) {
           setProjects(
             list.map((item) => {
-              const project = item as { id?: string; name?: string; worktree?: string }
+              const project = item as { id?: string; name?: string; canonical?: string; worktree?: string }
+              const canonical = typeof project.canonical === "string" ? project.canonical : ""
+              const folder = canonical.split(/[\\/]/).filter(Boolean).pop()
               return {
                 id: String(project.id ?? ""),
-                name: project.name ?? project.worktree ?? String(project.id ?? ""),
+                name: project.name ?? folder ?? project.worktree ?? String(project.id ?? ""),
               }
             }).filter((project) => project.id.length > 0),
           )

@@ -50,21 +50,26 @@ export function BarChart(props: {
   height?: number
   color?: string
 }) {
+  const height = () => props.height ?? 120
   const max = () => Math.max(1, ...props.data.map((item) => item.value))
+  const barHeight = (value: number) => Math.max(1, (value / max()) * (height() - 22))
+
   return (
     <div
-      style={`display:flex;align-items:flex-end;gap:6px;height:${props.height ?? 120}px;padding-top:4px;`}
+      style={`display:flex;align-items:flex-end;gap:${props.data.length > 14 ? 2 : 6}px;height:${height()}px;padding-top:4px;`}
     >
       <For each={props.data}>
         {(item) => (
           <div
             title={`${item.label}: ${item.hint ?? String(item.value)}`}
-            style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%;"
+            style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;"
           >
             <div
-              style={`width:100%;max-width:34px;height:${Math.max(2, (item.value / max()) * 100)}%;background:${props.color ?? "#22c55e"};border-radius:4px 4px 2px 2px;opacity:${item.value === 0 ? 0.15 : 1};transition:height 0.3s ease;`}
+              style={`width:100%;max-width:34px;height:${barHeight(item.value)}px;background:${props.color ?? "#22c55e"};border-radius:4px 4px 2px 2px;opacity:${item.value === 0 ? 0.15 : 1};transition:height 0.3s ease;`}
             />
-            <span style="font-size:10px;opacity:0.55;white-space:nowrap;">{item.label}</span>
+            <span style="height:14px;line-height:14px;font-size:9px;opacity:0.55;white-space:nowrap;overflow:hidden;">
+              {item.label}
+            </span>
           </div>
         )}
       </For>
