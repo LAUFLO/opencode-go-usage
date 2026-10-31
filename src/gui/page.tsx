@@ -1,4 +1,4 @@
-import { Show, createMemo, type Accessor } from "solid-js"
+import { For, Show, createMemo, type Accessor } from "solid-js"
 import type { GoModel, Meter, UsageSnapshot } from "../rpc.ts"
 import type { ConsoleLimits, Prefs, StatsBundle } from "./types"
 import { Sparkline } from "./charts"
@@ -77,7 +77,7 @@ export function UsagePage(props: {
   statsError: Accessor<string | undefined>
   modelsError: Accessor<string | undefined>
   prefs: PrefsStore
-  currentProject: Accessor<string | undefined>
+  projects: Accessor<{ id: string; name: string }[]>
   copyState: Accessor<"idle" | "ok" | "fail">
   onRefresh: () => void
   onOpenConsole: () => void
@@ -111,7 +111,7 @@ export function UsagePage(props: {
 
   return (
     <div style="padding:24px;max-width:900px;display:flex;flex-direction:column;gap:20px;">
-      <div style="display:flex;flex-direction:column;gap:8px;">
+      <div style="border:1px solid rgba(127,127,127,0.2);border-radius:12px;background:rgba(127,127,127,0.03);padding:16px;display:flex;flex-direction:column;gap:10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
           <div>
             <div style="font-size:20px;font-weight:650;">OpenCode Go 用量</div>
@@ -147,28 +147,25 @@ export function UsagePage(props: {
             <option value="30000">30 秒</option>
             <option value="60000">60 秒</option>
           </select>
-          <Show
-            when={props.currentProject()}
-            fallback={<span style="font-size:11px;opacity:0.55;">统计范围：全部项目</span>}
+          <label
+            style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;"
+            title="本地统计（今日、趋势、按模型）的范围；官方额度始终是整个账号的"
           >
-            <label
-              style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;"
-              title="本地统计（今日、趋势、按模型）的范围；官方额度始终是整个账号的"
+            统计范围
+            <select
+              value={props.prefs.value.projectID ?? "all"}
+              onChange={(event) => {
+                const value = event.currentTarget.value
+                props.prefs.update((draft) => { draft.projectID = value === "all" ? undefined : value })
+              }}
+              style={selectStyle}
             >
-              统计范围
-              <select
-                value={props.prefs.value.scope}
-                onChange={(event) => {
-                  const value = event.currentTarget.value as Prefs["scope"]
-                  props.prefs.update((draft) => { draft.scope = value })
-                }}
-                style={selectStyle}
-              >
-                <option value="all">全部项目</option>
-                <option value="current">当前项目</option>
-              </select>
-            </label>
-          </Show>
+              <option value="all">全部项目</option>
+              <For each={props.projects()}>
+                {(project) => <option value={project.id}>{project.name}</option>}
+              </For>
+            </select>
+          </label>
           <button type="button" onClick={props.onCopy} style={buttonStyle}>
             {props.copyState() === "ok" ? "已复制" : props.copyState() === "fail" ? "复制失败" : "复制摘要"}
           </button>

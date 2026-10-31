@@ -61,6 +61,7 @@ export type ConsoleLimits = {
 export type Prefs = {
   interval: number
   scope: "all" | "current"
+  projectID?: string
   modelScope: "go" | "all"
   modelRange: "week" | "month"
   showCost: boolean

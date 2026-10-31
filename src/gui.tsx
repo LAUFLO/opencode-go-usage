@@ -18,6 +18,7 @@ const LIMITS_INTERVAL = 60_000
 const PrefsSchema = Schema.Struct({
   interval: Schema.Number,
   scope: Schema.Literals(["all", "current"]),
+  projectID: Schema.optional(Schema.String),
   modelScope: Schema.Literals(["go", "all"]),
   modelRange: Schema.Literals(["week", "month"]),
   showCost: Schema.Boolean,
@@ -54,11 +55,12 @@ export default Plugin.define({
     let statsLoading = false
     let statsAgain = false
 
-    const currentProject = () => {
-      const session = ctx.sessions.current()
-      return (session?.project as { id?: string } | undefined)?.id
-    }
-    const projectFilter = () => (prefs.value.scope === "current" ? currentProject() : undefined)
+    const projects = () =>
+      ctx.data.project.list().map((project) => ({
+        id: project.id,
+        name: project.name ?? project.worktree,
+      }))
+    const projectFilter = () => prefs.value.projectID
 
     const loadUsage = async (refresh = false) => {
       if (usageLoading) return
@@ -214,11 +216,11 @@ export default Plugin.define({
     let lastModels = Date.now()
     let lastLimits = Date.now()
 
-    let lastScope = `${prefs.value.scope}:${currentProject() ?? "all"}`
+    let lastProject = prefs.value.projectID ?? "all"
     createEffect(() => {
-      const key = `${prefs.value.scope}:${currentProject() ?? "all"}`
-      if (key === lastScope) return
-      lastScope = key
+      const key = prefs.value.projectID ?? "all"
+      if (key === lastProject) return
+      lastProject = key
       statsCache.clear()
       void loadStats()
     })
@@ -275,7 +277,7 @@ export default Plugin.define({
           statsError={statsError}
           modelsError={modelsError}
           prefs={prefsStore}
-          currentProject={currentProject}
+          projects={projects}
           copyState={copyState}
           onRefresh={refreshAll}
           onOpenConsole={openConsole}
