@@ -7,7 +7,6 @@ A desktop plugin for [OpenCode](https://opencode.ai) that shows your **OpenCode 
 ## Features
 
 - **Session header badge** — `Go 5h 2% · 周 2% · 月 1%` in every session title row.
-- **Titlebar pill** — `Go 月 1%` in the window titlebar; click it to open the detail page.
 - **Detail page** — three progress bars for the rolling 5-hour, weekly, and monthly windows, each with its reset time.
 - **Command palette** — run `查看 OpenCode Go 用量` to jump to the detail page.
 - **Live updates** — refreshes every 10 seconds; the server caches for 15 seconds and supports manual refresh.
@@ -59,7 +58,6 @@ OpenCode Desktop reads plugins from `opencode.jsonc`, not `cli.json`. Save the f
 | Where | What you see |
 | --- | --- |
 | Session title row | `Go 5h 2% · 周 2% · 月 1%` |
-| Window titlebar | `Go 月 1%`, click to open details |
 | Settings / Command palette | Full progress bars, reset times, manual refresh |
 
 Colors: green below 70%, amber from 70%, red from 90%. A window that reaches its limit is marked as rate-limited until it resets.
@@ -100,7 +98,7 @@ Project layout:
 ```text
 index.ts                  Server part: credential, HTTP request, cache, RPC
 src/rpc.ts                RPC contract shared by server and GUI
-src/gui.tsx               Window part: titlebar, slot, settings page, command
+src/gui.tsx               Window part: slot, settings page, command
 src/gui/page.tsx          Detail page and badge components
 vite.config.ts            Official @opencode/plugin/gui/vite preset
 gui-experimental.cjs      Prebuilt GUI bundle loaded by Desktop
@@ -121,7 +119,6 @@ MIT
 这是一个 **OpenCode Desktop 插件**，用来在桌面端实时显示 OpenCode Go 的额度使用情况，TUI 里看不到。
 
 - **会话标题行**：显示 `Go 5h 2% · 周 2% · 月 1%`
-- **窗口顶栏**：显示 `Go 月 1%`，点击打开详情页
 - **详情页**：5 小时窗口、本周、本月三条进度条，带重置时间
 - **命令面板**：搜索「查看 OpenCode Go 用量」
 - **自动刷新**：每 10 秒一次，服务端缓存 15 秒，支持手动刷新

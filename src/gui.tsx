@@ -1,5 +1,5 @@
 import { createSignal } from "solid-js"
-import { Command, Plugin, SettingsPage, Slot, TitlebarItem } from "@opencode/plugin/gui"
+import { Command, Plugin, SettingsPage, Slot } from "@opencode/plugin/gui"
 import { GoUsage, type UsageSnapshot } from "./rpc.ts"
 import { UsageBadge, UsagePage } from "./gui/page"
 
@@ -37,19 +37,6 @@ export default Plugin.define({
     }, 3_000)
 
     const open = () => ctx.layout.settings(PAGE_ID)
-
-    ctx.add(TitlebarItem, (): TitlebarItem | undefined => {
-      const snapshot = value()
-      if (!snapshot?.connected || !snapshot.monthly) return undefined
-      const percent = Math.round(snapshot.monthly.percent)
-      return {
-        id: "usage",
-        label: `Go 月 ${percent}%`,
-        title: `OpenCode Go · 本月已用 ${percent}%`,
-        icon: "window-analytics",
-        run: open,
-      }
-    })
 
     ctx.add(Slot, {
       at: "session.header",
