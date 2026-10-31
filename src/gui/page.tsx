@@ -6,9 +6,6 @@ import { estimateCost } from "./model-table"
 import { ConsoleSection, DataNotes, HealthSection, ModelSection, TodaySection, TrendSection } from "./sections"
 import {
   clamp,
-  formatClock,
-  formatMoney,
-  formatPercent,
   formatReset,
   tone,
 } from "./format"
@@ -125,12 +122,6 @@ export function UsagePage(props: {
               />
               {connected() ? "OpenCode Go 已连接" : "未连接 OpenCode Go"}
             </span>
-            <Show when={props.usage()?.fetchedAt}>
-              <span style="font-size:10px;opacity:0.5;">
-                更新于 {formatClock(props.usage()?.fetchedAt)}
-                {props.usage()?.latencyMs !== undefined ? ` · ${props.usage()?.latencyMs}ms` : ""}
-              </span>
-            </Show>
           </div>
         </div>
 
@@ -150,19 +141,25 @@ export function UsagePage(props: {
             <option value="30000">30 秒</option>
             <option value="60000">60 秒</option>
           </select>
-          <select
-            value={props.prefs.value.scope}
-            onChange={(event) => {
-              const value = event.currentTarget.value as Prefs["scope"]
-              props.prefs.update((draft) => { draft.scope = value })
-            }}
-            style={selectStyle}
-            disabled={!props.currentProject()}
-            title={props.currentProject() ? undefined : "当前没有打开的项目会话"}
+          <label
+            style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;"
+            title="本地统计（今日、趋势、按模型）的范围；官方额度始终是整个账号的"
           >
-            <option value="all">全部项目</option>
-            <option value="current">当前项目</option>
-          </select>
+            统计范围
+            <select
+              value={props.prefs.value.scope}
+              onChange={(event) => {
+                const value = event.currentTarget.value as Prefs["scope"]
+                props.prefs.update((draft) => { draft.scope = value })
+              }}
+              style={selectStyle}
+              disabled={!props.currentProject()}
+              title={props.currentProject() ? undefined : "当前没有打开的项目会话"}
+            >
+              <option value="all">全部项目</option>
+              <option value="current">当前项目</option>
+            </select>
+          </label>
           <button type="button" onClick={props.onCopy} style={buttonStyle}>
             复制摘要
           </button>
@@ -188,7 +185,7 @@ export function UsagePage(props: {
       </Show>
 
       <Show when={connected()}>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;">
           <MeterCard
             label="5 小时窗口"
             hint="滚动窗口"
