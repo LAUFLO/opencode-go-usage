@@ -42,12 +42,14 @@ export default Plugin.define({
     const [stats, setStats] = createSignal<StatsBundle | undefined>()
     const [limits, setLimits] = createSignal<ConsoleLimits | undefined>()
     const [loading, setLoading] = createSignal(false)
+    const [copyState, setCopyState] = createSignal<"idle" | "ok" | "fail">("idle")
     const [error, setError] = createSignal<string | undefined>()
     const [statsError, setStatsError] = createSignal<string | undefined>()
     const [modelsError, setModelsError] = createSignal<string | undefined>()
 
     const statsCache = new Map<string, SessionStats>()
     let disposed = false
+    let copyTimer: ReturnType<typeof setTimeout> | undefined
     let usageLoading = false
     let statsLoading = false
     let statsAgain = false
@@ -138,7 +140,7 @@ export default Plugin.define({
         .reduce((sum, item) => sum + (estimateCost(catalog.get(item.model.id), item.tokens) ?? 0), 0)
     }
 
-    const copySummary = () => {
+    const copySummary = async () => {
       const value = usage()
       const today = stats()?.today
       const lines = [
@@ -149,7 +151,41 @@ export default Plugin.define({
       ]
       if (today) lines.push(`今日 ${today.steps} steps · ${formatTokens(sumTokens(today.tokens))} tokens`)
       if (estimatedToday() > 0) lines.push(`今日估算 ${formatMoney(estimatedToday())}`)
-      void ctx.system.copy(lines.join("\n"))
+
+      const text = lines.join("\n")
+      let ok = false
+      try {
+        await ctx.system.copy(text)
+        ok = true
+      } catch {
+        try {
+          if (typeof navigator !== "undefined" && navigator.clipboard) {
+            await navigator.clipboard.writeText(text)
+            ok = true
+          }
+        } catch {
+          ok = false
+        }
+      }
+
+      if (!ok && typeof document !== "undefined") {
+        try {
+          const textarea = document.createElement("textarea")
+          textarea.value = text
+          textarea.style.position = "fixed"
+          textarea.style.opacity = "0"
+          document.body.appendChild(textarea)
+          textarea.select()
+          ok = document.execCommand("copy")
+          textarea.remove()
+        } catch {
+          ok = false
+        }
+      }
+
+      setCopyState(ok ? "ok" : "fail")
+      clearTimeout(copyTimer)
+      copyTimer = setTimeout(() => setCopyState("idle"), 1_600)
     }
 
     const open = () => ctx.layout.settings(PAGE_ID)
@@ -240,6 +276,7 @@ export default Plugin.define({
           modelsError={modelsError}
           prefs={prefsStore}
           currentProject={currentProject}
+          copyState={copyState}
           onRefresh={refreshAll}
           onOpenConsole={openConsole}
           onOpenDocs={openDocs}
@@ -259,6 +296,7 @@ export default Plugin.define({
     return () => {
       disposed = true
       clearInterval(timer)
+      clearTimeout(copyTimer)
     }
   },
 })

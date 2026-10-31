@@ -79,15 +79,15 @@ export function StatTile(props: {
   tone?: string
 }) {
   return (
-    <div style="padding:10px 16px 10px 0;display:flex;flex-direction:column;gap:2px;min-width:0;">
-      <div style="font-size:10px;opacity:0.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+    <div style="border:1px solid rgba(127,127,127,0.18);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;min-width:0;">
+      <div style="font-size:11px;opacity:0.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
         {props.label}
       </div>
-      <div style={`font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:22px;font-weight:600;line-height:1.15;letter-spacing:-0.02em;color:${props.tone ?? "inherit"};font-variant-numeric:tabular-nums;`}>
+      <div style={`font-size:20px;font-weight:600;line-height:1.2;color:${props.tone ?? "inherit"};`}>
         {props.value}
       </div>
       <Show when={props.hint}>
-        <div style="font-size:10px;opacity:0.38;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        <div style="font-size:10px;opacity:0.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
           {props.hint}
         </div>
       </Show>
@@ -102,12 +102,12 @@ export function Section(props: {
   children: JSX.Element
 }) {
   return (
-    <div style="border-top:1px solid rgba(127,127,127,0.14);padding-top:16px;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-direction:column;gap:10px;">
       <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-        <div style="display:flex;align-items:baseline;gap:8px;">
+        <div>
           <span style="font-size:13px;font-weight:600;">{props.title}</span>
           <Show when={props.hint}>
-            <span style="font-size:10px;opacity:0.4;">{props.hint}</span>
+            <span style="margin-left:8px;font-size:11px;opacity:0.5;">{props.hint}</span>
           </Show>
         </div>
         {props.actions}

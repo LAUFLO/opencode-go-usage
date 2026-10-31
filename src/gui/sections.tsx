@@ -24,7 +24,7 @@ function labelFromKey(key: string) {
 }
 
 function toggleStyle(active: boolean) {
-  return `height:24px;padding:0 8px;border-radius:3px;border:1px solid rgba(127,127,127,0.18);background:${active ? "rgba(127,127,127,0.14)" : "transparent"};color:inherit;font-size:10px;cursor:pointer;`
+  return `padding:4px 10px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:${active ? "rgba(127,127,127,0.16)" : "transparent"};color:inherit;font-size:11px;cursor:pointer;`
 }
 
 export function TrendSection(props: { stats: Accessor<StatsBundle | undefined> }) {
@@ -50,19 +50,19 @@ export function TrendSection(props: { stats: Accessor<StatsBundle | undefined> }
 
   return (
     <Section title="使用趋势" hint="本机 OpenCode 统计">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;">
-        <div>
-          <div style="font-size:10px;opacity:0.4;margin-bottom:8px;">近 7 天 / steps</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+        <div style="border:1px solid rgba(127,127,127,0.18);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:11px;opacity:0.55;margin-bottom:8px;">近 7 天 · Steps</div>
           <BarChart data={steps()} height={110} color="#3b82f6" />
         </div>
-        <div>
-          <div style="font-size:10px;opacity:0.4;margin-bottom:8px;">近 7 天 / tokens</div>
+        <div style="border:1px solid rgba(127,127,127,0.18);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:11px;opacity:0.55;margin-bottom:8px;">近 7 天 · Tokens</div>
           <BarChart data={tokens()} height={110} color="#8b5cf6" />
         </div>
       </div>
-      <div style="border-top:1px solid rgba(127,127,127,0.1);padding-top:12px;">
-        <div style="font-size:10px;opacity:0.4;margin-bottom:8px;">近 30 天 / steps</div>
-        <BarChart data={monthSteps()} height={96} color="#14b8a6" />
+      <div style="border:1px solid rgba(127,127,127,0.18);border-radius:10px;padding:12px 14px;">
+        <div style="font-size:11px;opacity:0.55;margin-bottom:8px;">近 30 天 · Steps</div>
+        <BarChart data={monthSteps()} height={100} color="#14b8a6" />
       </div>
     </Section>
   )
@@ -141,7 +141,7 @@ export function HealthSection(props: { stats: Accessor<StatsBundle | undefined> 
 
   return (
     <Section title="工具与会话" hint="本机 OpenCode 统计">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0 24px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;">
         <StatTile
           label="工具成功率"
           value={rate() === undefined ? "—" : `${rate()!.toFixed(1)}%`}
@@ -183,30 +183,30 @@ export function ConsoleSection(props: {
           <button
             type="button"
             onClick={props.onOpenConsole}
-            style="border:none;border-bottom:1px solid rgba(127,127,127,0.25);background:none;color:inherit;font-size:10px;padding:0 0 2px;cursor:pointer;opacity:0.6;"
+            style="padding:4px 10px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:pointer;"
           >
             打开 Console
           </button>
         }
       >
-        <div style="display:flex;flex-direction:column;gap:0;">
+        <div style="display:flex;flex-direction:column;gap:10px;">
           <For each={budgets()}>
             {(budget) => {
               const used = () => (budget.limit > 0 ? Math.min(100, (budget.spent / budget.limit) * 100) : 100)
               return (
-                <div style="border-top:1px solid rgba(127,127,127,0.12);padding:10px 0;display:flex;flex-direction:column;gap:6px;">
+                <div style="border:1px solid rgba(127,127,127,0.18);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;">
                   <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;">
-                    <span style="font-size:11px;">{budgetLabel(budget)}</span>
-                    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:10px;opacity:0.6;font-variant-numeric:tabular-nums;">
+                    <span style="font-size:12px;font-weight:500;">{budgetLabel(budget)}</span>
+                    <span style="font-size:12px;font-variant-numeric:tabular-nums;">
                       {formatMoney(budget.spent)} / {formatMoney(budget.limit)}
                     </span>
                   </div>
-                  <div style="height:2px;background:rgba(127,127,127,0.16);">
+                  <div style="height:6px;border-radius:999px;background:rgba(127,127,127,0.2);overflow:hidden;">
                     <div
-                      style={`height:100%;width:${used()}%;background:${used() >= 90 ? "#c94f4f" : used() >= 70 ? "#c98a1e" : "#2f9e6e"};transition:width .3s ease;`}
+                      style={`height:100%;width:${used()}%;border-radius:999px;background:${used() >= 90 ? "#ef4444" : used() >= 70 ? "#f59e0b" : "#22c55e"};transition:width .3s ease;`}
                     />
                   </div>
-                  <div style="display:flex;justify-content:space-between;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:9px;opacity:0.38;gap:12px;flex-wrap:wrap;">
+                  <div style="display:flex;justify-content:space-between;font-size:10px;opacity:0.55;gap:12px;flex-wrap:wrap;">
                     <span>剩余 {formatMoney(Math.max(0, budget.limit - budget.spent))}</span>
                     <span>{formatReset(budget.resetsAt)} 重置</span>
                   </div>
@@ -239,7 +239,7 @@ export function TodaySection(props: {
 
   return (
     <Section title="今日概览" hint="本机 OpenCode 统计">
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0 24px;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;">
         <StatTile label="Steps" value={formatNumber(today()?.steps)} hint="今日模型步数" />
         <StatTile label="Prompts" value={formatNumber(today()?.prompts)} hint="今日提交" />
         <StatTile label="会话" value={formatNumber(today()?.sessions)} hint={`子代理 ${formatNumber(today()?.subagents)}`} />
