@@ -110,7 +110,7 @@ export function UsagePage(props: {
   const selectStyle = "height:30px;box-sizing:border-box;padding:0 8px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;max-width:180px;flex-shrink:0;"
 
   return (
-    <div style="padding:14px;max-width:100%;min-width:0;display:flex;flex-direction:column;gap:14px;">
+    <div style="height:100%;min-height:0;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;padding:14px;max-width:100%;display:flex;flex-direction:column;gap:14px;">
       <div style="border:1px solid rgba(127,127,127,0.2);border-radius:12px;background:rgba(127,127,127,0.03);padding:12px;display:flex;flex-direction:column;gap:10px;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;">
           <div>

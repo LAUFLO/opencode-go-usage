@@ -291,8 +291,6 @@ export default Plugin.define({
       id: PANEL_ID,
       title: "OpenCode Go 用量",
       label: () => "Go 用量",
-      pinned: true,
-      closable: false,
     }
 
     ctx.add(Panel, {
@@ -305,7 +303,7 @@ export default Plugin.define({
         kind: "tab",
         icon: "window-analytics",
       },
-      list: () => [panelTab],
+      list: (input) => (input.open.includes(PANEL_ID) ? [panelTab] : []),
       render: () => (
         <UsagePage
           usage={usage}
