@@ -42,6 +42,7 @@ export default Plugin.define({
     const [models, setModels] = createSignal<GoModel[]>([])
     const [stats, setStats] = createSignal<StatsBundle | undefined>()
     const [limits, setLimits] = createSignal<ConsoleLimits | undefined>()
+    const [projects, setProjects] = createSignal<{ id: string; name: string }[]>([])
     const [loading, setLoading] = createSignal(false)
     const [copyState, setCopyState] = createSignal<"idle" | "ok" | "fail">("idle")
     const [error, setError] = createSignal<string | undefined>()
@@ -55,12 +56,31 @@ export default Plugin.define({
     let statsLoading = false
     let statsAgain = false
 
-    const projects = () =>
-      ctx.data.project.list().map((project) => ({
-        id: project.id,
-        name: project.name ?? project.worktree,
-      }))
     const projectFilter = () => prefs.value.projectID
+
+    const loadProjects = async () => {
+      try {
+        const result = (await ctx.client.project.list()) as unknown
+        const list = Array.isArray(result)
+          ? result
+          : Array.isArray((result as { data?: unknown }).data)
+            ? (result as { data: unknown[] }).data
+            : []
+        if (!disposed) {
+          setProjects(
+            list.map((item) => {
+              const project = item as { id?: string; name?: string; worktree?: string }
+              return {
+                id: String(project.id ?? ""),
+                name: project.name ?? project.worktree ?? String(project.id ?? ""),
+              }
+            }).filter((project) => project.id.length > 0),
+          )
+        }
+      } catch {
+        if (!disposed) setProjects([])
+      }
+    }
 
     const loadUsage = async (refresh = false) => {
       if (usageLoading) return
@@ -131,6 +151,7 @@ export default Plugin.define({
       void loadStats()
       void loadModels(true)
       void loadLimits()
+      void loadProjects()
     }
 
     const estimatedToday = () => {
@@ -210,6 +231,7 @@ export default Plugin.define({
     void loadModels(false)
     void loadStats()
     void loadLimits()
+    void loadProjects()
 
     let lastUsage = Date.now()
     let lastStats = Date.now()
