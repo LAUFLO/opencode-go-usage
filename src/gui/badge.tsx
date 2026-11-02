@@ -14,7 +14,7 @@ export function UsageBadge(props: {
           type="button"
           onClick={props.onOpen}
           title="查看 OpenCode Go 用量"
-          style="display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:11px;cursor:pointer;white-space:nowrap;"
+          style="display:flex;align-items:center;gap:6px;height:24px;padding:0 9px;border-radius:999px;border:1px solid rgba(127,127,127,0.25);background:transparent;color:inherit;font-size:11px;cursor:pointer;opacity:0.85;white-space:nowrap;"
         >
           <span style="font-weight:600;">Go</span>
           <span style="opacity:0.6;">5h</span>
