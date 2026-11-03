@@ -17,6 +17,7 @@ const TICK = 5_000
 const STATS_INTERVAL = 60_000
 const MODELS_INTERVAL = 10 * 60_000
 const LIMITS_INTERVAL = 60_000
+const LOG_AUTO_REFRESH = 60_000
 
 const PrefsSchema = Schema.Struct({
   interval: Schema.Number,
@@ -157,8 +158,10 @@ export default Plugin.define({
     const LOG_LIMIT = 50
     let lastLogsAt = 0
     let lastLogsKey = ""
+    let lastLogsAttempt = 0
 
     const loadLogs = async (refresh = false) => {
+      lastLogsAttempt = Date.now()
       const key = `${projectFilter() ?? "all"}:${LOG_LIMIT}`
       if (!refresh && logs() !== undefined && key === lastLogsKey && Date.now() - lastLogsAt < 60_000) return
       if (logsLoading()) return
@@ -314,6 +317,9 @@ export default Plugin.define({
       if (now - lastLimits >= LIMITS_INTERVAL) {
         lastLimits = now
         void loadLimits()
+      }
+      if (logs() !== undefined && now - lastLogsAttempt >= LOG_AUTO_REFRESH) {
+        void loadLogs(true)
       }
     }, TICK)
 

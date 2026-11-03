@@ -322,7 +322,7 @@ export function LogsSection(props: {
   return (
     <Section
       title="请求日志"
-      hint={`本机 OpenCode 调用 · 共 ${rows().length} 条 · 每页 ${PAGE_SIZE} 条`}
+      hint={`本机 OpenCode 调用 · 共 ${rows().length} 条 · 每页 ${PAGE_SIZE} 条 · 每 60 秒自动刷新`}
       actions={
         <button
           type="button"
@@ -331,7 +331,7 @@ export function LogsSection(props: {
             props.onRefresh()
           }}
           disabled={props.loading()}
-          style={`padding:4px 10px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:pointer;opacity:${props.loading() ? "0.5" : "1"};`}
+          style={`min-width:72px;text-align:center;padding:4px 10px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:pointer;opacity:${props.loading() ? "0.5" : "1"};`}
         >
           {props.loading() ? "加载中…" : "刷新"}
         </button>
