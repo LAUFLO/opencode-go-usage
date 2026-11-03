@@ -1,8 +1,9 @@
-import { For, Show, createMemo, onMount, type Accessor } from "solid-js"
+import { Show, createMemo, onMount, type Accessor } from "solid-js"
 import type { GoModel, Meter, UsageSnapshot } from "../rpc.ts"
 import type { ConsoleLimits, Prefs, StatsBundle } from "./types"
 import type { RequestLog } from "./logs"
 import { Sparkline } from "./charts"
+import { Select } from "./select"
 import { estimateCost, averageContext } from "./model-table"
 import { ConsoleSection, DataNotes, HealthSection, LogsSection, ModelSection, TodaySection, TrendSection } from "./sections"
 import {
@@ -141,7 +142,6 @@ export function UsagePage(props: {
   }
 
   const buttonStyle = "height:30px;box-sizing:border-box;padding:0 12px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;"
-  const selectStyle = "height:30px;box-sizing:border-box;padding:0 8px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;max-width:180px;flex-shrink:0;"
 
   return (
     <div style="height:100%;min-height:0;box-sizing:border-box;overflow-y:auto;overscroll-behavior:contain;padding:14px;max-width:100%;display:flex;flex-direction:column;gap:14px;">
@@ -174,37 +174,31 @@ export function UsagePage(props: {
           >
             {props.loading() ? "刷新中…" : "刷新"}
           </button>
-          <select
+          <Select
             value={String(props.prefs.value.interval)}
-            onChange={(event) => {
-              const value = Number(event.currentTarget.value)
-              props.prefs.update((draft) => { draft.interval = value })
+            options={[
+              { value: "10000", label: "10 秒" },
+              { value: "30000", label: "30 秒" },
+              { value: "60000", label: "60 秒" },
+            ]}
+            onChange={(value) => {
+              const interval = Number(value)
+              props.prefs.update((draft) => { draft.interval = interval })
             }}
-            style={selectStyle}
-          >
-            <option value="10000">10 秒</option>
-            <option value="30000">30 秒</option>
-            <option value="60000">60 秒</option>
-          </select>
-          <label
-            style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;white-space:nowrap;flex-shrink:0;"
+            width="72px"
+          />
+          <Select
+            value={props.prefs.value.projectID ?? "all"}
+            options={[
+              { value: "all", label: "全部项目" },
+              ...props.projects().map((project) => ({ value: project.id, label: project.name })),
+            ]}
+            onChange={(value) => {
+              props.prefs.update((draft) => { draft.projectID = value === "all" ? undefined : value })
+            }}
             title="本地统计（今日、趋势、按模型）的范围；官方额度始终是整个账号的"
-          >
-            <select
-              value={props.prefs.value.projectID ?? "all"}
-              onChange={(event) => {
-                const value = event.currentTarget.value
-                props.prefs.update((draft) => { draft.projectID = value === "all" ? undefined : value })
-              }}
-              style={selectStyle}
-              title="本地统计范围"
-            >
-              <option value="all">全部项目</option>
-              <For each={props.projects()}>
-                {(project) => <option value={project.id}>{project.name}</option>}
-              </For>
-            </select>
-          </label>
+            width="150px"
+          />
           <button type="button" onClick={props.onCopy} style={buttonStyle}>
             {props.copyState() === "ok" ? "已复制" : props.copyState() === "fail" ? "复制失败" : "复制摘要"}
           </button>
