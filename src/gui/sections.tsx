@@ -322,7 +322,7 @@ export function LogsSection(props: {
   return (
     <Section
       title="请求日志"
-      hint={`本机 OpenCode 调用 · 共 ${rows().length} 条 · 每页 ${PAGE_SIZE} 条 · 每 60 秒自动刷新`}
+      hint={`本机 OpenCode 调用 · 最近 ${rows().length} 条 · 每页 ${PAGE_SIZE} 条 · 每 60 秒自动刷新`}
       actions={
         <button
           type="button"
