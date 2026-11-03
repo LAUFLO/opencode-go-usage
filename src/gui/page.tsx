@@ -110,6 +110,7 @@ export function UsagePage(props: {
   logsLoading: Accessor<boolean>
   onLoadLogs: () => void
   onRefreshLogs: () => void
+  dark: Accessor<boolean>
   onRefresh: () => void
   onOpenConsole: () => void
   onOpenDocs: () => void
@@ -186,6 +187,7 @@ export function UsagePage(props: {
               props.prefs.update((draft) => { draft.interval = interval })
             }}
             width="72px"
+            dark={props.dark()}
           />
           <Select
             value={props.prefs.value.projectID ?? "all"}
@@ -198,6 +200,7 @@ export function UsagePage(props: {
             }}
             title="本地统计（今日、趋势、按模型）的范围；官方额度始终是整个账号的"
             width="150px"
+            dark={props.dark()}
           />
           <button type="button" onClick={props.onCopy} style={buttonStyle}>
             {props.copyState() === "ok" ? "已复制" : props.copyState() === "fail" ? "复制失败" : "复制摘要"}

@@ -1,4 +1,5 @@
 import { For, Show, createSignal, onCleanup, onMount } from "solid-js"
+import { Portal } from "solid-js/web"
 
 export type SelectOption = { value: string; label: string }
 
@@ -8,10 +9,14 @@ export function Select(props: {
   onChange: (value: string) => void
   title?: string
   width?: string
+  dark?: boolean
 }) {
   const [open, setOpen] = createSignal(false)
   const [position, setPosition] = createSignal({ left: 0, top: 0, width: 0 })
   let root: HTMLDivElement | undefined
+  let menu: HTMLDivElement | undefined
+
+  const dark = () => props.dark === true
 
   const toggle = () => {
     if (!open() && root) {
@@ -26,7 +31,9 @@ export function Select(props: {
   }
 
   const onPointerDown = (event: MouseEvent) => {
-    if (root && !root.contains(event.target as Node)) setOpen(false)
+    const target = event.target as Node
+    if (root?.contains(target) || menu?.contains(target)) return
+    setOpen(false)
   }
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape") setOpen(false)
@@ -49,17 +56,26 @@ export function Select(props: {
   const current = () => props.options.find((item) => item.value === props.value)?.label ?? props.value
   const menuWidth = () => Math.max(120, position().width)
 
+  const triggerStyle = () =>
+    `height:30px;box-sizing:border-box;padding:0 10px;border-radius:8px;border:none;background:${
+      dark() ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)"
+    };color:inherit;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;`
+
+  const menuStyle = () =>
+    `position:fixed;z-index:100;left:${position().left}px;top:${position().top}px;min-width:${menuWidth()}px;max-width:280px;max-height:300px;overflow-y:auto;padding:6px;border-radius:12px;border:1px solid ${
+      dark() ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.07)"
+    };background:${dark() ? "#1f1f1f" : "#ffffff"};color:${
+      dark() ? "#ededed" : "#111111"
+    };box-shadow:0 8px 24px ${dark() ? "rgba(0,0,0,0.45)" : "rgba(0,0,0,0.14)"};`
+
+  const optionStyle = (active: boolean) =>
+    `display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:7px 8px;border:none;border-radius:7px;background:${
+      active ? (dark() ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)") : "transparent"
+    };color:inherit;font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden;`
+
   return (
-    <div
-      ref={root}
-      style={`position:relative;flex-shrink:0;${props.width ? `width:${props.width};` : ""}`}
-    >
-      <button
-        type="button"
-        title={props.title}
-        onClick={toggle}
-        style="height:30px;box-sizing:border-box;padding:0 8px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;"
-      >
+    <div ref={root} style={`position:relative;flex-shrink:0;${props.width ? `width:${props.width};` : ""}`}>
+      <button type="button" title={props.title} onClick={toggle} style={triggerStyle()}>
         <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{current()}</span>
         <span
           style={`opacity:0.45;font-size:9px;line-height:1;transition:transform .15s ease;transform:rotate(${open() ? 180 : 0}deg);`}
@@ -68,25 +84,28 @@ export function Select(props: {
         </span>
       </button>
       <Show when={open()}>
-        <div
-          style={`position:fixed;z-index:100;left:${position().left}px;top:${position().top}px;min-width:${menuWidth()}px;max-width:280px;max-height:300px;overflow-y:auto;padding:4px;border-radius:8px;border:1px solid rgba(127,127,127,0.25);background:rgba(127,127,127,0.14);backdrop-filter:blur(20px) saturate(1.2);box-shadow:0 10px 30px rgba(0,0,0,0.35);`}
-        >
-          <For each={props.options}>
-            {(option) => (
-              <button
-                type="button"
-                title={option.label}
-                onClick={() => {
-                  props.onChange(option.value)
-                  setOpen(false)
-                }}
-                style={`display:block;width:100%;text-align:left;padding:6px 8px;border:none;border-radius:5px;background:${option.value === props.value ? "rgba(127,127,127,0.22)" : "transparent"};color:inherit;font-size:12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`}
-              >
-                {option.label}
-              </button>
-            )}
-          </For>
-        </div>
+        <Portal>
+          <div ref={menu} style={menuStyle()}>
+            <For each={props.options}>
+              {(option) => (
+                <button
+                  type="button"
+                  title={option.label}
+                  onClick={() => {
+                    props.onChange(option.value)
+                    setOpen(false)
+                  }}
+                  style={optionStyle(option.value === props.value)}
+                >
+                  <span style="flex:1;overflow:hidden;text-overflow:ellipsis;">{option.label}</span>
+                  <Show when={option.value === props.value}>
+                    <span style="opacity:0.6;font-size:11px;">✓</span>
+                  </Show>
+                </button>
+              )}
+            </For>
+          </div>
+        </Portal>
       </Show>
     </div>
   )

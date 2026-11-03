@@ -364,6 +364,7 @@ export default Plugin.define({
           logsLoading={logsLoading}
           onLoadLogs={() => void loadLogs()}
           onRefreshLogs={() => void loadLogs(true)}
+          dark={() => ctx.appearance.mode() === "dark"}
           onRefresh={refreshAll}
           onOpenConsole={openConsole}
           onOpenDocs={openDocs}
