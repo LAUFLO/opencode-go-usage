@@ -159,7 +159,12 @@ export function UsagePage(props: {
         </div>
 
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:nowrap;overflow-x:auto;">
-          <button type="button" onClick={props.onRefresh} disabled={props.loading()} style={`${buttonStyle}opacity:${props.loading() ? "0.5" : "1"};`}>
+          <button
+            type="button"
+            onClick={props.onRefresh}
+            disabled={props.loading()}
+            style={`${buttonStyle}min-width:76px;text-align:center;opacity:${props.loading() ? "0.5" : "1"};`}
+          >
             {props.loading() ? "刷新中…" : "刷新"}
           </button>
           <select
@@ -178,7 +183,6 @@ export function UsagePage(props: {
             style="display:flex;align-items:center;gap:6px;font-size:11px;opacity:0.7;white-space:nowrap;flex-shrink:0;"
             title="本地统计（今日、趋势、按模型）的范围；官方额度始终是整个账号的"
           >
-            统计范围
             <select
               value={props.prefs.value.projectID ?? "all"}
               onChange={(event) => {
@@ -186,6 +190,7 @@ export function UsagePage(props: {
                 props.prefs.update((draft) => { draft.projectID = value === "all" ? undefined : value })
               }}
               style={selectStyle}
+              title="本地统计范围"
             >
               <option value="all">全部项目</option>
               <For each={props.projects()}>
