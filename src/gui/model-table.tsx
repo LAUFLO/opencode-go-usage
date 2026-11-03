@@ -21,9 +21,12 @@ export function isPeak(peak: NonNullable<GoModel["peak"]>, at = Date.now()) {
   })
 }
 
-export function isFree(model: GoModel | undefined) {
-  if (!model) return false
-  return model.free ?? (model.input === 0 && model.output === 0)
+export function isFree(model: GoModel | undefined, id?: string) {
+  if (model?.free) return true
+  const key = model?.id ?? id ?? ""
+  if (key.endsWith("-free")) return true
+  if (model && model.input === 0 && model.output === 0) return true
+  return false
 }
 
 export function priceFor(model: GoModel | undefined, contextTokens = 0, at = Date.now()) {
@@ -156,7 +159,7 @@ export function ModelTable(props: {
                           <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
                             {row.model?.name ?? row.usage.model.id}
                           </span>
-                          <Show when={isFree(row.model)}>
+                          <Show when={isFree(row.model, row.usage.model.id)}>
                             <span style="flex-shrink:0;padding:0 5px;border-radius:4px;border:1px solid rgba(34,197,94,0.4);color:#22c55e;font-size:9px;line-height:14px;">
                               免费
                             </span>

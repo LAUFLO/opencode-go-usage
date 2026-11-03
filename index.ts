@@ -13,6 +13,7 @@ import {
 
 const USAGE_ENDPOINT = "https://opencode.ai/zen/go/v1/usage"
 const MODELS_ENDPOINT = "https://opencode.ai/zen/go/v1/models"
+const CONSOLE_MODELS_ENDPOINT = "https://opencode.ai/inference/v1/models"
 const USAGE_TTL = 15_000
 const MODELS_TTL = 10 * 60_000
 const SAMPLE_INTERVAL = 60_000
@@ -312,34 +313,55 @@ export default Plugin.define({
           return { fetchedAt: Date.now(), models: [], error: credential.error }
         }
 
-        let response: Awaited<ReturnType<typeof fetch>>
-        try {
-          response = await fetch(MODELS_ENDPOINT, {
-            headers: {
-              Authorization: `Bearer ${credential.key}`,
-              Accept: "application/json",
-            },
-          })
-        } catch (error) {
-          return { fetchedAt: Date.now(), models: [], error: `请求模型列表失败：${String(error)}` }
+        const headers = {
+          Authorization: `Bearer ${credential.key}`,
+          Accept: "application/json",
         }
 
-        if (!response.ok) {
+        const [goResult, consoleResult] = await Promise.allSettled([
+          fetch(MODELS_ENDPOINT, { headers }),
+          fetch(CONSOLE_MODELS_ENDPOINT, { headers }),
+        ])
+
+        if (goResult.status === "rejected") {
           return {
             fetchedAt: Date.now(),
             models: [],
-            error: `模型列表接口返回 HTTP ${response.status}`,
+            error: `请求模型列表失败：${String(goResult.reason)}`,
           }
         }
 
-        let body: RawModelsBody
+        const goResponse = goResult.value
+        if (!goResponse.ok) {
+          return {
+            fetchedAt: Date.now(),
+            models: [],
+            error: `模型列表接口返回 HTTP ${goResponse.status}`,
+          }
+        }
+
+        let goBody: RawModelsBody
         try {
-          body = (await response.json()) as RawModelsBody
+          goBody = (await goResponse.json()) as RawModelsBody
         } catch (error) {
           return { fetchedAt: Date.now(), models: [], error: `解析模型列表失败：${String(error)}` }
         }
 
-        const models = (body.data ?? []).map(toModel).filter((model): model is GoModel => model !== undefined)
+        let consoleBody: RawModelsBody | undefined
+        if (consoleResult.status === "fulfilled" && consoleResult.value.ok) {
+          try {
+            consoleBody = (await consoleResult.value.json()) as RawModelsBody
+          } catch {
+            consoleBody = undefined
+          }
+        }
+
+        const byId = new Map<string, GoModel>()
+        for (const raw of [...(consoleBody?.data ?? []), ...(goBody.data ?? [])]) {
+          const model = toModel(raw)
+          if (model) byId.set(model.id, model)
+        }
+        const models = [...byId.values()]
         const value = { fetchedAt: Date.now(), models }
         modelsCache = { at: Date.now(), value }
         return value
