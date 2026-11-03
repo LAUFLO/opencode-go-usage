@@ -1,4 +1,4 @@
-import { For, Show, createMemo, type Accessor } from "solid-js"
+import { For, Show, createEffect, createMemo, createSignal, type Accessor } from "solid-js"
 import type { GoModel } from "../rpc.ts"
 import type { ConsoleBudget, ConsoleLimits, Prefs, StatsBundle, SessionStats } from "./types"
 import type { RequestLog } from "./logs"
@@ -274,13 +274,18 @@ export function LogsSection(props: {
   error: Accessor<string | undefined>
   models: Accessor<GoModel[]>
   showCost: Accessor<boolean>
-  limit: Accessor<number>
   onRefresh: () => void
-  onMore: () => void
 }) {
+  const PAGE_SIZE = 10
+  const [page, setPage] = createSignal(1)
   const catalog = createMemo(() => new Map(props.models().map((model) => [model.id, model])))
   const rows = () => props.logs() ?? []
-  const hasMore = () => rows().length >= props.limit()
+  const pages = () => Math.max(1, Math.ceil(rows().length / PAGE_SIZE))
+  const pageRows = () => rows().slice((page() - 1) * PAGE_SIZE, page() * PAGE_SIZE)
+
+  createEffect(() => {
+    if (page() > pages()) setPage(pages())
+  })
 
   const modelName = (log: RequestLog) => catalog().get(log.model.id)?.name ?? log.model.id
   const cost = (log: RequestLog) => {
@@ -302,11 +307,14 @@ export function LogsSection(props: {
   return (
     <Section
       title="请求日志"
-      hint={`本机 OpenCode 调用 · 最近 ${rows().length} 条`}
+      hint={`本机 OpenCode 调用 · 共 ${rows().length} 条 · 每页 ${PAGE_SIZE} 条`}
       actions={
         <button
           type="button"
-          onClick={props.onRefresh}
+          onClick={() => {
+            setPage(1)
+            props.onRefresh()
+          }}
           disabled={props.loading()}
           style={`padding:4px 10px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:pointer;opacity:${props.loading() ? "0.5" : "1"};`}
         >
@@ -341,7 +349,7 @@ export function LogsSection(props: {
               </tr>
             </thead>
             <tbody>
-              <For each={rows()}>
+              <For each={pageRows()}>
                 {(log) => (
                   <tr style="border-top:1px solid rgba(127,127,127,0.15);" title={log.sessionTitle}>
                     <td style="padding:7px 8px 7px 0;white-space:nowrap;font-variant-numeric:tabular-nums;opacity:0.75;">
@@ -381,15 +389,28 @@ export function LogsSection(props: {
           </table>
         </div>
 
-        <Show when={hasMore()}>
-          <button
-            type="button"
-            onClick={props.onMore}
-            disabled={props.loading()}
-            style="align-self:center;padding:5px 14px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:pointer;opacity:0.8;"
-          >
-            {props.loading() ? "加载中…" : "加载更多"}
-          </button>
+        <Show when={rows().length > PAGE_SIZE}>
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px;font-size:11px;">
+            <button
+              type="button"
+              disabled={page() <= 1}
+              onClick={() => setPage(page() - 1)}
+              style={`padding:4px 10px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:${page() <= 1 ? "default" : "pointer"};opacity:${page() <= 1 ? "0.35" : "0.8"};`}
+            >
+              上一页
+            </button>
+            <span style="opacity:0.6;font-variant-numeric:tabular-nums;">
+              第 {page()} / {pages()} 页
+            </span>
+            <button
+              type="button"
+              disabled={page() >= pages()}
+              onClick={() => setPage(page() + 1)}
+              style={`padding:4px 10px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:${page() >= pages() ? "default" : "pointer"};opacity:${page() >= pages() ? "0.35" : "0.8"};`}
+            >
+              下一页
+            </button>
+          </div>
         </Show>
       </Show>
     </Section>

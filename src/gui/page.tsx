@@ -107,9 +107,8 @@ export function UsagePage(props: {
   logs: Accessor<RequestLog[] | undefined>
   logsError: Accessor<string | undefined>
   logsLoading: Accessor<boolean>
-  logsLimit: Accessor<number>
   onLoadLogs: () => void
-  onMoreLogs: () => void
+  onRefreshLogs: () => void
   onRefresh: () => void
   onOpenConsole: () => void
   onOpenDocs: () => void
@@ -289,9 +288,7 @@ export function UsagePage(props: {
         loading={props.logsLoading}
         models={props.models}
         showCost={() => props.prefs.value.showCost}
-        limit={props.logsLimit}
-        onRefresh={props.onLoadLogs}
-        onMore={props.onMoreLogs}
+        onRefresh={props.onRefreshLogs}
       />
 
       <DataNotes onOpenDocs={props.onOpenDocs} />

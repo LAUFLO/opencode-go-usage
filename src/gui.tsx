@@ -49,7 +49,6 @@ export default Plugin.define({
     const [logs, setLogs] = createSignal<RequestLog[] | undefined>()
     const [logsError, setLogsError] = createSignal<string | undefined>()
     const [logsLoading, setLogsLoading] = createSignal(false)
-    const [logsLimit, setLogsLimit] = createSignal(20)
     const [loading, setLoading] = createSignal(false)
     const [copyState, setCopyState] = createSignal<"idle" | "ok" | "fail">("idle")
     const [error, setError] = createSignal<string | undefined>()
@@ -155,18 +154,19 @@ export default Plugin.define({
       }
     }
 
+    const LOG_LIMIT = 50
     let lastLogsAt = 0
     let lastLogsKey = ""
 
     const loadLogs = async (refresh = false) => {
-      const key = `${projectFilter() ?? "all"}:${logsLimit()}`
+      const key = `${projectFilter() ?? "all"}:${LOG_LIMIT}`
       if (!refresh && logs() !== undefined && key === lastLogsKey && Date.now() - lastLogsAt < 60_000) return
       if (logsLoading()) return
       setLogsLoading(true)
       try {
         const result = await loadRequestLogs(ctx.client as never, {
           project: projectFilter(),
-          limit: logsLimit(),
+          limit: LOG_LIMIT,
         })
         if (disposed) return
         setLogs(result)
@@ -178,11 +178,6 @@ export default Plugin.define({
       } finally {
         if (!disposed) setLogsLoading(false)
       }
-    }
-
-    const loadMoreLogs = () => {
-      setLogsLimit((value) => value + 20)
-      void loadLogs(true)
     }
 
     const refreshAll = () => {
@@ -361,9 +356,8 @@ export default Plugin.define({
           logs={logs}
           logsError={logsError}
           logsLoading={logsLoading}
-          logsLimit={logsLimit}
           onLoadLogs={() => void loadLogs()}
-          onMoreLogs={loadMoreLogs}
+          onRefreshLogs={() => void loadLogs(true)}
           onRefresh={refreshAll}
           onOpenConsole={openConsole}
           onOpenDocs={openDocs}
