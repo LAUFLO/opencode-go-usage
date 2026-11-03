@@ -1,3 +1,5 @@
+import type { Meter } from "../rpc.ts"
+
 export function clamp(value: number | undefined, min = 0, max = 100) {
   if (typeof value !== "number" || !Number.isFinite(value)) return min
   return Math.max(min, Math.min(max, value))
@@ -85,6 +87,31 @@ export function formatCountdown(timestamp: number | undefined) {
   const diff = timestamp - Date.now()
   if (diff <= 0) return "即将重置"
   return formatDuration(diff)
+}
+
+/**
+ * Linear projection of when a quota window reaches 100%, using the
+ * official percent and reset time as the elapsed/remaining split.
+ */
+export function forecastReset(meter: Meter | undefined, windowMs: number) {
+  if (!meter) return undefined
+  const percent = clamp(meter.percent)
+  if (percent <= 0 || windowMs <= 0) return undefined
+
+  const now = Date.now()
+  const remainingMs = Math.max(0, meter.resetsAt - now)
+  const elapsedMs = Math.max(1, windowMs - remainingMs)
+  const rate = percent / elapsedMs
+  if (!Number.isFinite(rate) || rate <= 0) return undefined
+
+  const msToFull = (100 - percent) / rate
+  if (!Number.isFinite(msToFull) || msToFull <= 0) return undefined
+
+  return {
+    at: now + msToFull,
+    msToFull,
+    willResetFirst: now + msToFull >= meter.resetsAt,
+  }
 }
 
 export function dayStart(offset = 0) {

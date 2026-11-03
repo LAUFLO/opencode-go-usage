@@ -5,6 +5,8 @@ import {
   type GoModel,
   type GoModels,
   type Meter,
+  type PeakPrice,
+  type PriceTier,
   type Sample,
   type UsageSnapshot,
 } from "./src/rpc.ts"
@@ -31,15 +33,34 @@ type RawUsageBody = {
   }
 }
 
+type RawPriceOverride = {
+  when?: { context?: { gt?: number } }
+  price?: number
+  cache?: { read?: number; write?: number }
+}
+
+type RawMultiplier = {
+  when?: {
+    utc_days?: string[] | { in?: string[] }
+    any?: { all?: { utc_hours?: { gte?: string; lt?: string } }[] }[]
+  }
+  factor?: number
+}
+
 type RawModelCost = {
   text?: {
     input?: {
       price?: number
       cache?: { read?: number; write?: number }
+      overrides?: RawPriceOverride[]
     }
-    output?: { price?: number }
+    output?: {
+      price?: number
+      overrides?: RawPriceOverride[]
+    }
     cache?: { read?: number; write?: number }
   }
+  multipliers?: RawMultiplier[]
 }
 
 type RawModel = {
@@ -70,20 +91,87 @@ function price(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0
 }
 
+function toTiers(text: RawModelCost["text"]): PriceTier[] {
+  if (!text) return []
+  const inputOverrides = text.input?.overrides ?? []
+  const outputOverrides = text.output?.overrides ?? []
+  const thresholds = new Set<number>()
+  for (const item of [...inputOverrides, ...outputOverrides]) {
+    const gt = item.when?.context?.gt
+    if (typeof gt === "number" && Number.isFinite(gt)) thresholds.add(gt)
+  }
+
+  const tiers: PriceTier[] = []
+  for (const gt of thresholds) {
+    const input = inputOverrides.find((item) => item.when?.context?.gt === gt)
+    const output = outputOverrides.find((item) => item.when?.context?.gt === gt)
+    tiers.push({
+      contextGt: gt,
+      input: price(input?.price ?? text.input?.price),
+      output: price(output?.price ?? text.output?.price),
+      cacheRead: price(input?.cache?.read ?? text.input?.cache?.read ?? text.cache?.read),
+      cacheWrite: price(input?.cache?.write ?? text.input?.cache?.write ?? text.cache?.write),
+    })
+  }
+  return tiers.sort((a, b) => a.contextGt - b.contextGt)
+}
+
+const DAY_INDEX: Record<string, number> = {
+  sun: 0,
+  mon: 1,
+  tue: 2,
+  wed: 3,
+  thu: 4,
+  fri: 5,
+  sat: 6,
+}
+
+function toPeak(multipliers: RawMultiplier[] | undefined): PeakPrice | undefined {
+  for (const item of multipliers ?? []) {
+    const factor = typeof item.factor === "number" && item.factor > 1 ? item.factor : undefined
+    if (!factor) continue
+
+    const windows: { start: string; end: string }[] = []
+    for (const group of item.when?.any ?? []) {
+      const gte = group.all?.find((condition) => condition.utc_hours?.gte)?.utc_hours?.gte
+      const lt = group.all?.find((condition) => condition.utc_hours?.lt)?.utc_hours?.lt
+      if (gte && lt) windows.push({ start: gte, end: lt })
+    }
+    if (windows.length === 0) continue
+
+    const rawDays = item.when?.utc_days
+    const dayList = Array.isArray(rawDays) ? rawDays : Array.isArray(rawDays?.in) ? rawDays.in : []
+    const days = dayList
+      .map((day) => DAY_INDEX[String(day).toLowerCase()])
+      .filter((day): day is number => typeof day === "number")
+
+    return { factor, windows, utcDays: days.length > 0 ? days : undefined }
+  }
+  return undefined
+}
+
 function toModel(raw: RawModel): GoModel | undefined {
   if (typeof raw.id !== "string" || !raw.id) return undefined
 
   const text = raw.cost?.text
-  return {
+  const input = price(text?.input?.price)
+  const output = price(text?.output?.price)
+  const model: GoModel = {
     id: raw.id,
     name: typeof raw.name === "string" && raw.name ? raw.name : raw.id,
-    input: price(text?.input?.price),
-    output: price(text?.output?.price),
+    input,
+    output,
     cacheRead: price(text?.input?.cache?.read ?? text?.cache?.read),
     cacheWrite: price(text?.input?.cache?.write ?? text?.cache?.write),
     context: price(raw.limit?.context),
     outputLimit: price(raw.limit?.output),
+    tiers: toTiers(text),
+    free: input === 0 && output === 0,
   }
+
+  const peak = toPeak(raw.cost?.multipliers)
+  if (peak) model.peak = peak
+  return model
 }
 
 function isSample(value: unknown): value is Sample {

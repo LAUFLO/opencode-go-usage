@@ -79,7 +79,7 @@ export function ModelSection(props: {
   return (
     <Section
       title="按模型用量"
-      hint="本机统计 + 估算金额"
+      hint={`本机统计 · ${props.prefs.value.modelRange === "week" ? "本周 7 天" : "本月 30 天"} · ${formatNumber(current()?.steps ?? 0)} steps`}
       actions={
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button
@@ -120,12 +120,20 @@ export function ModelSection(props: {
         </div>
       }
     >
-      <ModelTable
-        stats={current}
-        models={props.models}
-        scope={() => props.prefs.value.modelScope}
-        showCost={() => props.prefs.value.showCost}
-      />
+      <Show
+        when={current()}
+        keyed
+        fallback={<div style="font-size:12px;opacity:0.5;padding:12px 0;">这个时间范围内还没有模型调用记录。</div>}
+      >
+        {(data) => (
+          <ModelTable
+            stats={() => data}
+            models={props.models}
+            scope={() => props.prefs.value.modelScope}
+            showCost={() => props.prefs.value.showCost}
+          />
+        )}
+      </Show>
     </Section>
   )
 }

@@ -24,6 +24,20 @@ export type UsageSnapshot = {
   history: Sample[]
 }
 
+export type PriceTier = {
+  contextGt: number
+  input: number
+  output: number
+  cacheRead: number
+  cacheWrite: number
+}
+
+export type PeakPrice = {
+  factor: number
+  utcDays?: number[]
+  windows: { start: string; end: string }[]
+}
+
 export type GoModel = {
   id: string
   name: string
@@ -33,6 +47,9 @@ export type GoModel = {
   cacheWrite: number
   context: number
   outputLimit: number
+  tiers: PriceTier[]
+  peak?: PeakPrice
+  free: boolean
 }
 
 export type GoModels = {
@@ -64,6 +81,41 @@ const SampleSchema = {
   additionalProperties: false,
 }
 
+const TierSchema = {
+  type: "object",
+  properties: {
+    contextGt: { type: "number" },
+    input: { type: "number" },
+    output: { type: "number" },
+    cacheRead: { type: "number" },
+    cacheWrite: { type: "number" },
+  },
+  required: ["contextGt", "input", "output", "cacheRead", "cacheWrite"],
+  additionalProperties: false,
+}
+
+const PeakSchema = {
+  type: "object",
+  properties: {
+    factor: { type: "number" },
+    utcDays: { type: "array", items: { type: "number" } },
+    windows: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          start: { type: "string" },
+          end: { type: "string" },
+        },
+        required: ["start", "end"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["factor", "windows"],
+  additionalProperties: false,
+}
+
 const ModelSchema = {
   type: "object",
   properties: {
@@ -75,8 +127,11 @@ const ModelSchema = {
     cacheWrite: { type: "number" },
     context: { type: "number" },
     outputLimit: { type: "number" },
+    tiers: { type: "array", items: TierSchema },
+    peak: PeakSchema,
+    free: { type: "boolean" },
   },
-  required: ["id", "name", "input", "output", "cacheRead", "cacheWrite", "context", "outputLimit"],
+  required: ["id", "name", "input", "output", "cacheRead", "cacheWrite", "context", "outputLimit", "tiers", "free"],
   additionalProperties: false,
 }
 

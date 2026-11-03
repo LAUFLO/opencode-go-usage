@@ -5,7 +5,7 @@ import type { PanelTab } from "@opencode/plugin/gui"
 import { GoUsage, type GoModel, type GoModels, type UsageSnapshot } from "./rpc.ts"
 import type { ConsoleLimits, Prefs, SessionStats, StatsBundle } from "./gui/types.ts"
 import { loadStatsBundle } from "./gui/stats.ts"
-import { estimateCost } from "./gui/model-table.tsx"
+import { estimateCost, averageContext } from "./gui/model-table.tsx"
 import { formatMoney, formatPercent, formatTokens, sumTokens } from "./gui/format.ts"
 import { UsageBadge } from "./gui/badge.tsx"
 import { UsagePage } from "./gui/page.tsx"
@@ -164,7 +164,10 @@ export default Plugin.define({
       const catalog = new Map(models().map((model) => [model.id, model]))
       return today.models
         .filter((item) => item.model.providerID === "opencode-go")
-        .reduce((sum, item) => sum + (estimateCost(catalog.get(item.model.id), item.tokens) ?? 0), 0)
+        .reduce((sum, item) => {
+          const context = averageContext(item.tokens, item.steps)
+          return sum + (estimateCost(catalog.get(item.model.id), item.tokens, context) ?? 0)
+        }, 0)
     }
 
     const copySummary = async () => {

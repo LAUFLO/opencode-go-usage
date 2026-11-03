@@ -2,12 +2,15 @@ import { For, Show, createMemo, type Accessor } from "solid-js"
 import type { GoModel, Meter, UsageSnapshot } from "../rpc.ts"
 import type { ConsoleLimits, Prefs, StatsBundle } from "./types"
 import { Sparkline } from "./charts"
-import { estimateCost } from "./model-table"
+import { estimateCost, averageContext } from "./model-table"
 import { ConsoleSection, DataNotes, HealthSection, ModelSection, TodaySection, TrendSection } from "./sections"
 import {
   clamp,
   formatCountdown,
+  formatDateTime,
+  formatDuration,
   formatReset,
+  forecastReset,
   tone,
 } from "./format"
 
@@ -23,12 +26,30 @@ function MeterCard(props: {
   meter?: Meter
   points: number[]
   trend: string
+  windowMs: number
 }) {
   const percent = () => clamp(props.meter?.percent)
   const remaining = () => 100 - percent()
   const reset = () => {
     const value = formatCountdown(props.meter?.resetsAt)
     return value === "即将重置" ? value : `${value}后`
+  }
+  const forecast = () => forecastReset(props.meter, props.windowMs)
+  const forecastText = () => {
+    const value = forecast()
+    if (!value) return "按当前速度 · 暂无消耗"
+    if (value.willResetFirst) return "按当前速度 · 本周期不会用完"
+    return `按当前速度 · ${formatDuration(value.msToFull)}后用完`
+  }
+  const forecastColor = () => {
+    const value = forecast()
+    if (!value || value.willResetFirst) return "rgba(127,127,127,0.55)"
+    return "#f59e0b"
+  }
+  const forecastTitle = () => {
+    const value = forecast()
+    if (!value) return undefined
+    return `预计 ${formatDateTime(value.at)} 达到 100%`
   }
 
   return (
@@ -63,6 +84,9 @@ function MeterCard(props: {
       <div style="font-size:10px;opacity:0.5;" title={formatReset(props.meter?.resetsAt)}>
         重置 · {reset()}
       </div>
+      <div style={`font-size:10px;color:${forecastColor()};`} title={forecastTitle()}>
+        {forecastText()}
+      </div>
     </div>
   )
 }
@@ -91,7 +115,10 @@ export function UsagePage(props: {
     if (!today) return 0
     return today.models
       .filter((item) => item.model.providerID === "opencode-go")
-      .reduce((sum, item) => sum + (estimateCost(catalog().get(item.model.id), item.tokens) ?? 0), 0)
+      .reduce((sum, item) => {
+        const context = averageContext(item.tokens, item.steps)
+        return sum + (estimateCost(catalog().get(item.model.id), item.tokens, context) ?? 0)
+      }, 0)
   }
 
   const points = (key: "rolling" | "weekly" | "monthly") => {
@@ -199,6 +226,7 @@ export function UsagePage(props: {
             meter={props.usage()?.rolling}
             points={points("rolling")}
             trend={trend("rolling")}
+            windowMs={5 * 60 * 60_000}
           />
           <MeterCard
             label="本周"
@@ -207,6 +235,7 @@ export function UsagePage(props: {
             meter={props.usage()?.weekly}
             points={points("weekly")}
             trend={trend("weekly")}
+            windowMs={7 * 24 * 60 * 60_000}
           />
           <MeterCard
             label="本月"
@@ -215,6 +244,7 @@ export function UsagePage(props: {
             meter={props.usage()?.monthly}
             points={points("monthly")}
             trend={trend("monthly")}
+            windowMs={30 * 24 * 60 * 60_000}
           />
         </div>
       </Show>

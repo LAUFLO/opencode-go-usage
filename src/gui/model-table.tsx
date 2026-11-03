@@ -3,16 +3,82 @@ import type { GoModel } from "../rpc.ts"
 import type { ModelUsage, SessionStats } from "./types"
 import { formatMoney, formatNumber, formatTokens } from "./format"
 
-export function estimateCost(model: GoModel | undefined, tokens: ModelUsage["tokens"]) {
+export function toMinutes(value: string) {
+  const [hours, minutes] = value.split(":").map(Number)
+  return (Number.isFinite(hours) ? hours : 0) * 60 + (Number.isFinite(minutes) ? minutes : 0)
+}
+
+export function isPeak(peak: NonNullable<GoModel["peak"]>, at = Date.now()) {
+  const date = new Date(at)
+  if (peak.utcDays && peak.utcDays.length > 0 && !peak.utcDays.includes(date.getUTCDay())) return false
+
+  const minutes = date.getUTCHours() * 60 + date.getUTCMinutes()
+  return peak.windows.some((window) => {
+    const start = toMinutes(window.start)
+    const end = toMinutes(window.end)
+    if (end >= start) return minutes >= start && minutes < end
+    return minutes >= start || minutes < end
+  })
+}
+
+export function isFree(model: GoModel | undefined) {
+  if (!model) return false
+  return model.free ?? (model.input === 0 && model.output === 0)
+}
+
+export function priceFor(model: GoModel | undefined, contextTokens = 0, at = Date.now()) {
   if (!model) return undefined
+
+  let input = model.input
+  let output = model.output
+  let cacheRead = model.cacheRead
+  let cacheWrite = model.cacheWrite
+
+  const tier = [...(model.tiers ?? [])]
+    .filter((item) => contextTokens > item.contextGt)
+    .sort((a, b) => b.contextGt - a.contextGt)[0]
+  if (tier) {
+    input = tier.input
+    output = tier.output
+    cacheRead = tier.cacheRead
+    cacheWrite = tier.cacheWrite
+  }
+
+  const peak = model.peak ? isPeak(model.peak, at) : false
+  const factor = peak && model.peak ? model.peak.factor : 1
+
+  return {
+    input: input * factor,
+    output: output * factor,
+    cacheRead: cacheRead * factor,
+    cacheWrite: cacheWrite * factor,
+    peak,
+    tier: tier?.contextGt,
+  }
+}
+
+export function estimateCost(
+  model: GoModel | undefined,
+  tokens: ModelUsage["tokens"],
+  contextTokens = 0,
+  at = Date.now(),
+) {
+  const price = priceFor(model, contextTokens, at)
+  if (!price) return undefined
+
   const output = tokens.output + tokens.reasoning
   return (
-    (tokens.input * model.input +
-      output * model.output +
-      tokens.cache.read * model.cacheRead +
-      tokens.cache.write * model.cacheWrite) /
+    (tokens.input * price.input +
+      output * price.output +
+      tokens.cache.read * price.cacheRead +
+      tokens.cache.write * price.cacheWrite) /
     1_000_000
   )
+}
+
+/** Average context per request, used to pick the long-context price tier. */
+export function averageContext(tokens: ModelUsage["tokens"], steps: number) {
+  return Math.round((tokens.input + tokens.cache.read) / Math.max(1, steps))
 }
 
 export function ModelTable(props: {
@@ -33,7 +99,13 @@ export function ModelTable(props: {
     return filtered
       .map((usage) => {
         const model = catalog().get(usage.model.id)
-        return { usage, model, cost: estimateCost(model, usage.tokens) }
+        const context = averageContext(usage.tokens, usage.steps)
+        return {
+          usage,
+          model,
+          cost: estimateCost(model, usage.tokens, context),
+          peak: model?.peak ? isPeak(model.peak) : false,
+        }
       })
       .sort((a, b) => (b.cost ?? 0) - (a.cost ?? 0) || b.usage.steps - a.usage.steps)
   })
@@ -51,7 +123,7 @@ export function ModelTable(props: {
         <Show when={props.showCost()}>
           <div style="font-size:11px;opacity:0.65;">
             估算合计 <strong style="font-weight:600;">{formatMoney(total())}</strong>
-            <span style="opacity:0.5;">（按公开基础价，未计高峰倍率）</span>
+            <span style="opacity:0.5;">（按官方价格表，含时段倍率与长上下文阶梯价）</span>
           </div>
         </Show>
       </div>
@@ -80,9 +152,21 @@ export function ModelTable(props: {
                   <tr style="border-top:1px solid rgba(127,127,127,0.15);">
                     <td style="padding:8px 8px 8px 0;max-width:220px;">
                       <div style="display:flex;flex-direction:column;gap:2px;">
-                        <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                          {row.model?.name ?? row.usage.model.id}
-                        </span>
+                        <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+                          <span style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            {row.model?.name ?? row.usage.model.id}
+                          </span>
+                          <Show when={isFree(row.model)}>
+                            <span style="flex-shrink:0;padding:0 5px;border-radius:4px;border:1px solid rgba(34,197,94,0.4);color:#22c55e;font-size:9px;line-height:14px;">
+                              免费
+                            </span>
+                          </Show>
+                          <Show when={row.peak}>
+                            <span style="flex-shrink:0;padding:0 5px;border-radius:4px;border:1px solid rgba(245,158,11,0.4);color:#f59e0b;font-size:9px;line-height:14px;">
+                              高峰 ×{row.model?.peak?.factor ?? 2}
+                            </span>
+                          </Show>
+                        </div>
                         <span style="font-size:10px;opacity:0.45;">
                           {row.usage.model.providerID}
                           {row.usage.model.variant ? ` · ${row.usage.model.variant}` : ""}

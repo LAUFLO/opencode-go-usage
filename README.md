@@ -68,7 +68,11 @@ OpenCode Desktop reads plugins from `opencode.jsonc`, not `cli.json`. Save the f
 
 Click the badge in the session title row, or run **View OpenCode Go usage** from the command palette, to open the panel on the right side of the session. The panel stays pinned there; close the side region to hide it without losing the tab.
 
-The dashboard combines two sources: the official OpenCode Go usage API for the three allowance percentages, and local OpenCode session statistics for everything else. The local numbers cover only this machine; other devices and clients are not included. Dollar amounts are estimates at public base prices and are not a substitute for the Console bill.
+The dashboard combines two sources: the official OpenCode Go usage API for the three allowance percentages, and local OpenCode session statistics for everything else. The local numbers cover only this machine; other devices and clients are not included.
+
+Dollar amounts are estimates from the official model price table. They include peak-hour multipliers (for example DeepSeek doubles during weekday UTC peak windows) and long-context price tiers (for example Grok above 200K tokens), but they are not a substitute for the Console bill. Models priced at zero are marked **免费**.
+
+Each quota card also projects when the window would reach 100% at the current pace, using the official percentage and reset time. If the projection lands after the reset, it shows that the window will not run out this period.
 
 ## How it works
 
