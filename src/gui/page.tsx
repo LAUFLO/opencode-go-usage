@@ -1,9 +1,10 @@
-import { For, Show, createMemo, type Accessor } from "solid-js"
+import { For, Show, createMemo, onMount, type Accessor } from "solid-js"
 import type { GoModel, Meter, UsageSnapshot } from "../rpc.ts"
 import type { ConsoleLimits, Prefs, StatsBundle } from "./types"
+import type { RequestLog } from "./logs"
 import { Sparkline } from "./charts"
 import { estimateCost, averageContext } from "./model-table"
-import { ConsoleSection, DataNotes, HealthSection, ModelSection, TodaySection, TrendSection } from "./sections"
+import { ConsoleSection, DataNotes, HealthSection, LogsSection, ModelSection, TodaySection, TrendSection } from "./sections"
 import {
   clamp,
   formatCountdown,
@@ -103,12 +104,19 @@ export function UsagePage(props: {
   prefs: PrefsStore
   projects: Accessor<{ id: string; name: string }[]>
   copyState: Accessor<"idle" | "ok" | "fail">
+  logs: Accessor<RequestLog[] | undefined>
+  logsError: Accessor<string | undefined>
+  logsLoading: Accessor<boolean>
+  logsLimit: Accessor<number>
+  onLoadLogs: () => void
+  onMoreLogs: () => void
   onRefresh: () => void
   onOpenConsole: () => void
   onOpenDocs: () => void
   onCopy: () => void
 }) {
   const connected = () => props.usage()?.connected === true
+  onMount(() => props.onLoadLogs())
   const catalog = createMemo(() => new Map(props.models().map((model) => [model.id, model])))
   const estimated = () => {
     const today = props.stats()?.today
@@ -274,6 +282,17 @@ export function UsagePage(props: {
       </Show>
 
       <ConsoleSection limits={props.limits} onOpenConsole={props.onOpenConsole} />
+
+      <LogsSection
+        logs={props.logs}
+        error={props.logsError}
+        loading={props.logsLoading}
+        models={props.models}
+        showCost={() => props.prefs.value.showCost}
+        limit={props.logsLimit}
+        onRefresh={props.onLoadLogs}
+        onMore={props.onMoreLogs}
+      />
 
       <DataNotes onOpenDocs={props.onOpenDocs} />
     </div>

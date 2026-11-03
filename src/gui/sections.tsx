@@ -1,8 +1,9 @@
-import { For, Show, type Accessor } from "solid-js"
+import { For, Show, createMemo, type Accessor } from "solid-js"
 import type { GoModel } from "../rpc.ts"
 import type { ConsoleBudget, ConsoleLimits, Prefs, StatsBundle, SessionStats } from "./types"
+import type { RequestLog } from "./logs"
 import { BarChart, Section, StatTile } from "./charts"
-import { ModelTable } from "./model-table"
+import { ModelTable, averageContext, estimateCost } from "./model-table"
 import {
   formatMoney,
   formatNumber,
@@ -263,6 +264,134 @@ export function TodaySection(props: {
         <StatTile label="缓存读取" value={formatTokens(today()?.tokens.cache.read)} hint="今日缓存命中" />
         <StatTile label="工具调用" value={formatNumber(today()?.tools.totals?.calls)} hint="今日" />
       </div>
+    </Section>
+  )
+}
+
+export function LogsSection(props: {
+  logs: Accessor<RequestLog[] | undefined>
+  loading: Accessor<boolean>
+  error: Accessor<string | undefined>
+  models: Accessor<GoModel[]>
+  showCost: Accessor<boolean>
+  limit: Accessor<number>
+  onRefresh: () => void
+  onMore: () => void
+}) {
+  const catalog = createMemo(() => new Map(props.models().map((model) => [model.id, model])))
+  const rows = () => props.logs() ?? []
+  const hasMore = () => rows().length >= props.limit()
+
+  const modelName = (log: RequestLog) => catalog().get(log.model.id)?.name ?? log.model.id
+  const cost = (log: RequestLog) => {
+    const model = catalog().get(log.model.id)
+    return estimateCost(model, log.tokens, log.tokens.input + log.tokens.cache.read)
+  }
+  const duration = (log: RequestLog) => {
+    if (!log.durationMs) return "—"
+    return `${(log.durationMs / 1000).toFixed(1)}s`
+  }
+  const time = (log: RequestLog) =>
+    new Date(log.at).toLocaleString("zh-CN", {
+      month: "numeric",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+
+  return (
+    <Section
+      title="请求日志"
+      hint={`本机 OpenCode 调用 · 最近 ${rows().length} 条`}
+      actions={
+        <button
+          type="button"
+          onClick={props.onRefresh}
+          disabled={props.loading()}
+          style={`padding:4px 10px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:pointer;opacity:${props.loading() ? "0.5" : "1"};`}
+        >
+          {props.loading() ? "加载中…" : "刷新"}
+        </button>
+      }
+    >
+      <Show when={props.error()}>
+        <div style="font-size:11px;color:#ef4444;opacity:0.85;">{props.error()}</div>
+      </Show>
+
+      <Show
+        when={rows().length > 0}
+        fallback={
+          <div style="font-size:12px;opacity:0.5;padding:12px 0;">
+            {props.loading() ? "正在读取本机调用记录…" : "还没有请求记录。"}
+          </div>
+        }
+      >
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:520px;">
+            <thead>
+              <tr style="text-align:left;opacity:0.55;font-size:11px;">
+                <th style="padding:6px 8px 6px 0;font-weight:500;">时间</th>
+                <th style="padding:6px 8px;font-weight:500;">状态</th>
+                <th style="padding:6px 8px;font-weight:500;">模型</th>
+                <th style="padding:6px 8px;font-weight:500;text-align:right;">耗时</th>
+                <th style="padding:6px 8px;font-weight:500;text-align:right;">Tokens</th>
+                <Show when={props.showCost()}>
+                  <th style="padding:6px 0 6px 8px;font-weight:500;text-align:right;">估算</th>
+                </Show>
+              </tr>
+            </thead>
+            <tbody>
+              <For each={rows()}>
+                {(log) => (
+                  <tr style="border-top:1px solid rgba(127,127,127,0.15);" title={log.sessionTitle}>
+                    <td style="padding:7px 8px 7px 0;white-space:nowrap;font-variant-numeric:tabular-nums;opacity:0.75;">
+                      {time(log)}
+                    </td>
+                    <td style="padding:7px 8px;">
+                      <span
+                        style={`display:inline-block;width:6px;height:6px;border-radius:999px;background:${log.status === "ok" ? "#22c55e" : "#f59e0b"};`}
+                      />
+                    </td>
+                    <td style="padding:7px 8px;max-width:220px;">
+                      <div style="display:flex;flex-direction:column;gap:1px;">
+                        <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                          {modelName(log)}
+                        </span>
+                        <span style="font-size:10px;opacity:0.45;">
+                          {log.model.providerID}
+                          {log.model.variant ? ` · ${log.model.variant}` : ""}
+                        </span>
+                      </div>
+                    </td>
+                    <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;opacity:0.75;">
+                      {duration(log)}
+                    </td>
+                    <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;">
+                      {formatTokens(sumTokens(log.tokens))}
+                    </td>
+                    <Show when={props.showCost()}>
+                      <td style="padding:7px 0 7px 8px;text-align:right;font-variant-numeric:tabular-nums;">
+                        {cost(log) === undefined ? "—" : `≈ ${formatMoney(cost(log))}`}
+                      </td>
+                    </Show>
+                  </tr>
+                )}
+              </For>
+            </tbody>
+          </table>
+        </div>
+
+        <Show when={hasMore()}>
+          <button
+            type="button"
+            onClick={props.onMore}
+            disabled={props.loading()}
+            style="align-self:center;padding:5px 14px;border-radius:6px;border:1px solid rgba(127,127,127,0.28);background:transparent;color:inherit;font-size:11px;cursor:pointer;opacity:0.8;"
+          >
+            {props.loading() ? "加载中…" : "加载更多"}
+          </button>
+        </Show>
+      </Show>
     </Section>
   )
 }

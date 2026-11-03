@@ -5,6 +5,7 @@ import type { PanelTab } from "@opencode/plugin/gui"
 import { GoUsage, type GoModel, type GoModels, type UsageSnapshot } from "./rpc.ts"
 import type { ConsoleLimits, Prefs, SessionStats, StatsBundle } from "./gui/types.ts"
 import { loadStatsBundle } from "./gui/stats.ts"
+import { loadRequestLogs, type RequestLog } from "./gui/logs.ts"
 import { estimateCost, averageContext } from "./gui/model-table.tsx"
 import { formatMoney, formatPercent, formatTokens, sumTokens } from "./gui/format.ts"
 import { UsageBadge } from "./gui/badge.tsx"
@@ -45,6 +46,10 @@ export default Plugin.define({
     const [stats, setStats] = createSignal<StatsBundle | undefined>()
     const [limits, setLimits] = createSignal<ConsoleLimits | undefined>()
     const [projects, setProjects] = createSignal<{ id: string; name: string }[]>([])
+    const [logs, setLogs] = createSignal<RequestLog[] | undefined>()
+    const [logsError, setLogsError] = createSignal<string | undefined>()
+    const [logsLoading, setLogsLoading] = createSignal(false)
+    const [logsLimit, setLogsLimit] = createSignal(20)
     const [loading, setLoading] = createSignal(false)
     const [copyState, setCopyState] = createSignal<"idle" | "ok" | "fail">("idle")
     const [error, setError] = createSignal<string | undefined>()
@@ -150,12 +155,43 @@ export default Plugin.define({
       }
     }
 
+    let lastLogsAt = 0
+    let lastLogsKey = ""
+
+    const loadLogs = async (refresh = false) => {
+      const key = `${projectFilter() ?? "all"}:${logsLimit()}`
+      if (!refresh && logs() !== undefined && key === lastLogsKey && Date.now() - lastLogsAt < 60_000) return
+      if (logsLoading()) return
+      setLogsLoading(true)
+      try {
+        const result = await loadRequestLogs(ctx.client as never, {
+          project: projectFilter(),
+          limit: logsLimit(),
+        })
+        if (disposed) return
+        setLogs(result)
+        setLogsError(undefined)
+        lastLogsKey = key
+        lastLogsAt = Date.now()
+      } catch (cause) {
+        if (!disposed) setLogsError(`无法读取请求日志：${String(cause)}`)
+      } finally {
+        if (!disposed) setLogsLoading(false)
+      }
+    }
+
+    const loadMoreLogs = () => {
+      setLogsLimit((value) => value + 20)
+      void loadLogs(true)
+    }
+
     const refreshAll = () => {
       void loadUsage(true)
       void loadStats()
       void loadModels(true)
       void loadLimits()
       void loadProjects()
+      void loadLogs(true)
     }
 
     const estimatedToday = () => {
@@ -261,6 +297,8 @@ export default Plugin.define({
       if (key === lastProject) return
       lastProject = key
       statsCache.clear()
+      setLogs(undefined)
+      lastLogsAt = 0
       void loadStats()
     })
 
@@ -320,6 +358,12 @@ export default Plugin.define({
           prefs={prefsStore}
           projects={projects}
           copyState={copyState}
+          logs={logs}
+          logsError={logsError}
+          logsLoading={logsLoading}
+          logsLimit={logsLimit}
+          onLoadLogs={() => void loadLogs()}
+          onMoreLogs={loadMoreLogs}
           onRefresh={refreshAll}
           onOpenConsole={openConsole}
           onOpenDocs={openDocs}
