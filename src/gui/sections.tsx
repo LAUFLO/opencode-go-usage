@@ -30,23 +30,32 @@ function toggleStyle(active: boolean) {
 
 export function TrendSection(props: { stats: Accessor<StatsBundle | undefined> }) {
   const days = () => props.stats()?.days ?? []
+  const last7 = () => days().slice(-7)
+  const last30 = () => days().slice(-30)
+
   const steps = () =>
-    days().map((day) => ({
+    last7().map((day) => ({
       label: labelFromKey(day.date),
       value: day.stats.steps,
       hint: `${formatNumber(day.stats.steps)} steps`,
     }))
   const tokens = () =>
-    days().map((day) => ({
+    last7().map((day) => ({
       label: labelFromKey(day.date),
       value: sumTokens(day.stats.tokens),
       hint: `${formatTokens(sumTokens(day.stats.tokens))} tokens`,
     }))
   const monthSteps = () =>
-    (props.stats()?.month.activity ?? []).slice(-30).map((item, index) => ({
-      label: index % 5 === 0 ? labelFromKey(item.date) : "",
-      value: item.steps,
-      hint: `${item.date}: ${formatNumber(item.steps)} steps`,
+    last30().map((day, index) => ({
+      label: index % 5 === 0 ? labelFromKey(day.date) : "",
+      value: day.stats.steps,
+      hint: `${day.date}: ${formatNumber(day.stats.steps)} steps`,
+    }))
+  const monthTokens = () =>
+    last30().map((day, index) => ({
+      label: index % 5 === 0 ? labelFromKey(day.date) : "",
+      value: sumTokens(day.stats.tokens),
+      hint: `${day.date}: ${formatTokens(sumTokens(day.stats.tokens))} tokens`,
     }))
 
   return (
@@ -61,9 +70,15 @@ export function TrendSection(props: { stats: Accessor<StatsBundle | undefined> }
           <BarChart data={tokens()} height={110} color="#8b5cf6" />
         </div>
       </div>
-      <div style="border:1px solid rgba(127,127,127,0.18);border-radius:10px;padding:12px 14px;">
-        <div style="font-size:11px;opacity:0.55;margin-bottom:8px;">近 30 天 · Steps</div>
-        <BarChart data={monthSteps()} height={100} color="#14b8a6" />
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;">
+        <div style="border:1px solid rgba(127,127,127,0.18);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:11px;opacity:0.55;margin-bottom:8px;">近 30 天 · Steps</div>
+          <BarChart data={monthSteps()} height={100} color="#14b8a6" />
+        </div>
+        <div style="border:1px solid rgba(127,127,127,0.18);border-radius:10px;padding:12px 14px;">
+          <div style="font-size:11px;opacity:0.55;margin-bottom:8px;">近 30 天 · Tokens</div>
+          <BarChart data={monthTokens()} height={100} color="#f59e0b" />
+        </div>
       </div>
     </Section>
   )

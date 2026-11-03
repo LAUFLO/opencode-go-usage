@@ -1,5 +1,4 @@
 import { For, Show, type JSX } from "solid-js"
-import { clamp } from "./format"
 
 export function Sparkline(props: {
   points: number[]
@@ -7,15 +6,26 @@ export function Sparkline(props: {
   color?: string
   max?: number
 }) {
-  const max = () => Math.max(1, props.max ?? 100)
+  const bounds = () => {
+    if (props.max !== undefined) return { min: 0, max: Math.max(1, props.max) }
+    const values = props.points
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const span = Math.max(0.25, max - min)
+    const center = (min + max) / 2
+    return { min: Math.max(0, center - span / 2), max: center + span / 2 }
+  }
+
   const coords = () => {
     const values = props.points
     if (values.length < 2) return ""
+    const { min, max } = bounds()
+    const span = Math.max(0.0001, max - min)
     return values
       .map((value, index) => {
         const x = (index / (values.length - 1)) * 100
-        const y = 100 - (clamp(value) / max()) * 100
-        return `${x.toFixed(2)},${y.toFixed(2)}`
+        const y = 95 - ((value - min) / span) * 90
+        return `${x.toFixed(2)},${Math.max(2, Math.min(98, y)).toFixed(2)}`
       })
       .join(" ")
   }

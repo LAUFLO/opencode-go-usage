@@ -100,6 +100,20 @@ async function fetchStats(client: StatsClient, input: StatsInput) {
   return normalizeStats(await client.experimental.session.stats(input))
 }
 
+async function mapLimit<T, R>(items: T[], limit: number, run: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let next = 0
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next
+      next += 1
+      results[index] = await run(items[index])
+    }
+  })
+  await Promise.all(workers)
+  return results
+}
+
 export async function loadStatsBundle(
   client: StatsClient,
   options: { project?: string; cache: Map<string, SessionStats> },
@@ -132,7 +146,7 @@ export async function loadStatsBundle(
   const missing: { date: string; from: number; to: number }[] = []
   const days: StatsDay[] = []
 
-  for (let offset = -6; offset <= -1; offset += 1) {
+  for (let offset = -29; offset <= -1; offset += 1) {
     const from = dayStart(offset)
     const date = dayKey(from)
     const cached = options.cache.get(date)
@@ -143,17 +157,15 @@ export async function loadStatsBundle(
     missing.push({ date, from, to: dayStart(offset + 1) })
   }
 
-  const fetched = await Promise.all(
-    missing.map(async (item) => ({
-      date: item.date,
-      stats: await fetchStats(client, {
-        ...common,
-        from: item.from,
-        to: item.to,
-        tools: "none",
-      }),
-    })),
-  )
+  const fetched = await mapLimit(missing, 5, async (item) => ({
+    date: item.date,
+    stats: await fetchStats(client, {
+      ...common,
+      from: item.from,
+      to: item.to,
+      tools: "none",
+    }),
+  }))
 
   for (const item of fetched) {
     options.cache.set(item.date, item.stats)
