@@ -1,4 +1,4 @@
-import { dayKey, dayStart, timezone } from "./format"
+import { dayKey, dayStart, monthStart, timezone, weekStart } from "./format"
 import type { SessionStats, StatsBundle, StatsDay, StatsTokens } from "./types"
 
 type StatsInput = {
@@ -117,13 +117,13 @@ export async function loadStatsBundle(
     }),
     fetchStats(client, {
       ...common,
-      from: dayStart(-6),
+      from: weekStart(),
       to: Date.now(),
       tools: "summary",
     }),
     fetchStats(client, {
       ...common,
-      from: dayStart(-29),
+      from: monthStart(),
       to: Date.now(),
       tools: "summary",
     }),

@@ -121,6 +121,23 @@ export function dayStart(offset = 0) {
   return date.getTime()
 }
 
+/** Monday 00:00 of the current week, in local time. */
+export function weekStart() {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  const offset = (date.getDay() + 6) % 7
+  date.setDate(date.getDate() - offset)
+  return date.getTime()
+}
+
+/** The 1st of the current month at 00:00, in local time. */
+export function monthStart() {
+  const date = new Date()
+  date.setHours(0, 0, 0, 0)
+  date.setDate(1)
+  return date.getTime()
+}
+
 export function dayKey(timestamp: number) {
   const date = new Date(timestamp)
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`

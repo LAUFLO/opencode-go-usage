@@ -80,7 +80,7 @@ export function ModelSection(props: {
   return (
     <Section
       title="按模型用量"
-      hint={`本机统计 · ${props.prefs.value.modelRange === "week" ? "本周 7 天" : "本月 30 天"} · ${formatNumber(current()?.steps ?? 0)} steps`}
+      hint={`本机统计 · ${props.prefs.value.modelRange === "week" ? "本周" : "本月"} · ${formatNumber(current()?.steps ?? 0)} steps`}
       actions={
         <div style="display:flex;gap:6px;flex-wrap:wrap;">
           <button
