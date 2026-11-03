@@ -57,9 +57,7 @@ export function Select(props: {
   const menuWidth = () => Math.max(120, position().width)
 
   const triggerStyle = () =>
-    `height:30px;box-sizing:border-box;padding:0 10px;border-radius:8px;border:none;background:${
-      dark() ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.05)"
-    };color:inherit;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;`
+    "height:30px;box-sizing:border-box;padding:0 12px;border-radius:7px;border:1px solid rgba(127,127,127,0.3);background:transparent;color:inherit;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-width:0;"
 
   const menuStyle = () =>
     `position:fixed;z-index:100;left:${position().left}px;top:${position().top}px;min-width:${menuWidth()}px;max-width:280px;max-height:300px;overflow-y:auto;padding:6px;border-radius:12px;border:1px solid ${
