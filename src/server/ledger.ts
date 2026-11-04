@@ -18,6 +18,7 @@ type StoredDay = {
   steps: number
   prompts: number
   sessions: string[]
+  sessionCount: number
   tokens: LedgerTokens
   models: StoredModel[]
 }
@@ -110,7 +111,13 @@ export function createLedger(storage: Storage) {
   async function load() {
     try {
       const raw = (await storage.get(KEY)) as StoredLedger | undefined
-      if (raw && Array.isArray(raw.days)) days = raw.days.filter(isStoredDay)
+      if (raw && Array.isArray(raw.days)) {
+        days = raw.days.filter(isStoredDay).map((day) => ({
+          ...day,
+          sessions: Array.isArray(day.sessions) ? day.sessions : [],
+          sessionCount: typeof day.sessionCount === "number" ? day.sessionCount : 0,
+        }))
+      }
       if (raw && Array.isArray(raw.seen)) {
         seen = new Set(raw.seen.filter((id): id is string => typeof id === "string"))
       }
@@ -147,6 +154,7 @@ export function createLedger(storage: Storage) {
         steps: 0,
         prompts: 0,
         sessions: [],
+        sessionCount: 0,
         tokens: emptyTokens(),
         models: [],
       }
@@ -236,7 +244,7 @@ export function createLedger(storage: Storage) {
         date: day.date,
         steps: day.steps,
         prompts: day.prompts,
-        sessions: day.sessions.length,
+        sessions: Math.max(day.sessions.length, day.sessionCount ?? 0),
         tokens: normalizeTokens(day.tokens),
         models: day.models.map((item): LedgerModel => ({
           model: {
@@ -251,32 +259,82 @@ export function createLedger(storage: Storage) {
   }
 
   function backfill(directory: string, input: LedgerDay[]) {
-    let added = 0
+    let changed = 0
     for (const day of input) {
       if (!day || typeof day.date !== "string") continue
-      const exists = days.some((item) => item.directory === directory && item.date === day.date)
-      if (exists) continue
-      days.push({
-        directory,
-        date: day.date,
-        steps: num(day.steps),
-        prompts: num(day.prompts),
-        sessions: [],
-        tokens: normalizeTokens(day.tokens),
-        models: (day.models ?? []).map((item) => ({
-          model: {
-            id: String(item.model?.id ?? ""),
-            providerID: String(item.model?.providerID ?? ""),
-            ...(item.model?.variant ? { variant: item.model.variant } : {}),
-          },
-          steps: num(item.steps),
-          tokens: normalizeTokens(item.tokens),
-        })),
-      })
-      added += 1
+
+      const steps = num(day.steps)
+      const prompts = num(day.prompts)
+      const sessionCount = num(day.sessions)
+      const tokens = normalizeTokens(day.tokens)
+      const models = (day.models ?? []).map((item) => ({
+        model: {
+          id: String(item.model?.id ?? ""),
+          providerID: String(item.model?.providerID ?? ""),
+          ...(item.model?.variant ? { variant: item.model.variant } : {}),
+        },
+        steps: num(item.steps),
+        tokens: normalizeTokens(item.tokens),
+      }))
+
+      let existing = days.find((item) => item.directory === directory && item.date === day.date)
+      if (!existing) {
+        days.push({
+          directory,
+          date: day.date,
+          steps,
+          prompts,
+          sessions: [],
+          sessionCount,
+          tokens,
+          models,
+        })
+        changed += 1
+        continue
+      }
+
+      if (steps > existing.steps) {
+        existing.steps = steps
+        changed += 1
+      }
+      if (prompts > existing.prompts) {
+        existing.prompts = prompts
+        changed += 1
+      }
+      if (sessionCount > existing.sessionCount) {
+        existing.sessionCount = sessionCount
+        changed += 1
+      }
+
+      existing.tokens.input = Math.max(existing.tokens.input, tokens.input)
+      existing.tokens.output = Math.max(existing.tokens.output, tokens.output)
+      existing.tokens.reasoning = Math.max(existing.tokens.reasoning, tokens.reasoning)
+      existing.tokens.cache.read = Math.max(existing.tokens.cache.read, tokens.cache.read)
+      existing.tokens.cache.write = Math.max(existing.tokens.cache.write, tokens.cache.write)
+
+      for (const item of models) {
+        const key = `${item.model.providerID}/${item.model.id}`
+        const entry = existing.models.find(
+          (model) => `${model.model.providerID}/${model.model.id}` === key,
+        )
+        if (!entry) {
+          existing.models.push(item)
+          changed += 1
+          continue
+        }
+        if (item.steps > entry.steps) {
+          entry.steps = item.steps
+          changed += 1
+        }
+        entry.tokens.input = Math.max(entry.tokens.input, item.tokens.input)
+        entry.tokens.output = Math.max(entry.tokens.output, item.tokens.output)
+        entry.tokens.reasoning = Math.max(entry.tokens.reasoning, item.tokens.reasoning)
+        entry.tokens.cache.read = Math.max(entry.tokens.cache.read, item.tokens.cache.read)
+        entry.tokens.cache.write = Math.max(entry.tokens.cache.write, item.tokens.cache.write)
+      }
     }
-    if (added > 0) schedule()
-    return added
+    if (changed > 0) schedule()
+    return changed
   }
 
   return { load, seed, handle, flush, snapshot, backfill }

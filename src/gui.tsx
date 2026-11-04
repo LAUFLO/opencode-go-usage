@@ -2,9 +2,9 @@ import { createEffect, createSignal } from "solid-js"
 import { Schema } from "effect"
 import { Command, MenuItem, Panel, Plugin, Slot, Store } from "@opencode/plugin/gui"
 import type { PanelTab } from "@opencode/plugin/gui"
-import { GoUsage, type GoModel, type GoModels, type UsageSnapshot } from "./rpc.ts"
+import { GoUsage, type GoModel, type GoModels, type LedgerDay, type UsageSnapshot } from "./rpc.ts"
 import type { ConsoleLimits, Prefs, SessionStats, StatsBundle } from "./gui/types.ts"
-import { loadStatsBundle } from "./gui/stats.ts"
+import { loadStatsBundle, mergeLedger } from "./gui/stats.ts"
 import { loadRequestLogs, type RequestLog } from "./gui/logs.ts"
 import { estimateCost, averageContext } from "./gui/model-table.tsx"
 import { formatMoney, formatPercent, formatTokens, sumTokens } from "./gui/format.ts"
@@ -131,7 +131,38 @@ export default Plugin.define({
           cache: statsCache,
         })
         if (disposed) return
-        setStats(result)
+
+        let merged = result
+        if (!projectFilter()) {
+          try {
+            let ledger = (await ctx.client.rpc(GoUsage).ledger({})) as { days: LedgerDay[] }
+            const backfill = result.days.map((day) => ({
+              directory: "unknown",
+              date: day.date,
+              steps: day.stats.steps,
+              prompts: day.stats.prompts,
+              sessions: day.stats.sessions,
+              tokens: day.stats.tokens,
+              models: day.stats.models.map((item) => ({
+                model: {
+                  id: item.model.id,
+                  providerID: item.model.providerID,
+                  ...(item.model.variant ? { variant: item.model.variant } : {}),
+                },
+                steps: item.steps,
+                tokens: item.tokens,
+              })),
+            }))
+            await ctx.client.rpc(GoUsage).backfill({ directory: "unknown", days: backfill })
+            ledger = (await ctx.client.rpc(GoUsage).ledger({})) as { days: LedgerDay[] }
+            merged = mergeLedger(result, ledger.days)
+          } catch {
+            merged = result
+          }
+        }
+
+        if (disposed) return
+        setStats(merged)
         setStatsError(undefined)
       } catch (cause) {
         if (!disposed) setStatsError(`无法读取本机使用统计：${String(cause)}`)
