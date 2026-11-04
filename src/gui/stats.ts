@@ -281,16 +281,19 @@ function sumStatsDay(date: string, days: StatsDay[]): StatsDay {
 export function mergeLedger(stats: StatsBundle, ledger: LedgerDay[]): StatsBundle {
   if (ledger.length === 0) return stats
 
-  const ledgerDays = ledger.map(ledgerDayToStats)
-  const grouped = new Map<string, StatsDay[]>()
-  for (const day of ledgerDays) {
+  const grouped = new Map<string, LedgerDay[]>()
+  for (const day of ledger) {
     const list = grouped.get(day.date) ?? []
     list.push(day)
     grouped.set(day.date, list)
   }
-  const mergedDays = [...grouped.entries()].map(([date, list]) =>
-    list.length === 1 ? list[0] : sumStatsDay(date, list),
-  )
+
+  const mergedDays = [...grouped.entries()].map(([date, list]) => {
+    if (list.length === 1) return ledgerDayToStats(list[0])
+    const full = list.find((day) => day.directory === "unknown")
+    if (full) return ledgerDayToStats(full)
+    return sumStatsDay(date, list.map(ledgerDayToStats))
+  })
 
   const byDate = new Map(mergedDays.map((day) => [day.date, day]))
   const days = stats.days.map((day) => byDate.get(day.date) ?? day)

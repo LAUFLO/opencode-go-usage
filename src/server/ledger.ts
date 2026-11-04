@@ -269,15 +269,19 @@ export function createLedger(storage: Storage) {
         prompts: day.prompts,
         sessions: Math.max(day.sessions.length, day.sessionCount ?? 0),
         tokens: normalizeTokens(day.tokens),
-        models: day.models.map((item): LedgerModel => ({
-          model: {
-            id: item.model.id,
-            providerID: item.model.providerID,
-            ...(item.model.variant ? { variant: item.model.variant } : {}),
-          },
-          steps: item.steps,
-          tokens: normalizeTokens(item.tokens),
-        })),
+        models: day.models
+          .filter(
+            (item) => item.model.providerID !== "unknown" && item.model.providerID !== "internal",
+          )
+          .map((item): LedgerModel => ({
+            model: {
+              id: item.model.id,
+              providerID: item.model.providerID,
+              ...(item.model.variant ? { variant: item.model.variant } : {}),
+            },
+            steps: item.steps,
+            tokens: normalizeTokens(item.tokens),
+          })),
       }))
   }
 
