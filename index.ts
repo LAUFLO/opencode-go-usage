@@ -4,12 +4,14 @@ import {
   GoUsage,
   type GoModel,
   type GoModels,
+  type LedgerDay,
   type Meter,
   type PeakPrice,
   type PriceTier,
   type Sample,
   type UsageSnapshot,
 } from "./src/rpc.ts"
+import { createLedger } from "./src/server/ledger.ts"
 
 const USAGE_ENDPOINT = "https://opencode.ai/zen/go/v1/usage"
 const MODELS_ENDPOINT = "https://opencode.ai/zen/go/v1/models"
@@ -372,9 +374,51 @@ export default Plugin.define({
       return modelsInflight
     }
 
+    const ledger = createLedger(ctx.storage)
+    await ledger.load()
+
+    try {
+      const sessions = await ctx.session.list({ limit: 100 })
+      const list = Array.isArray(sessions) ? sessions : (sessions as { data?: unknown })?.data
+      if (Array.isArray(list)) {
+        ledger.seed(
+          list as { id?: string; model?: { id: string; providerID: string; variant?: string } }[],
+        )
+      }
+    } catch {
+      // seeding only improves model attribution; ignore failures
+    }
+
+    const controller = new AbortController()
+    void (async () => {
+      try {
+        for await (const event of ctx.event.subscribe({
+          types: ["session.step.ended", "session.model.selected", "session.usage.recorded"],
+          signal: controller.signal,
+        })) {
+          ledger.handle(event)
+        }
+      } catch {
+        // stream closed or aborted
+      }
+    })()
+
     await ctx.rpc.register(GoUsage, {
       get: async (input) => readUsage((input as { refresh?: boolean } | undefined)?.refresh === true),
       models: async (input) => readModels((input as { refresh?: boolean } | undefined)?.refresh === true),
+      ledger: async (input) => {
+        const value = input as { directory?: string } | undefined
+        return { days: ledger.snapshot(value?.directory) }
+      },
+      backfill: async (input) => {
+        const value = input as { directory: string; days: LedgerDay[] }
+        return { added: ledger.backfill(value.directory, value.days) }
+      },
     })
+
+    return async () => {
+      controller.abort()
+      await ledger.flush()
+    }
   },
 })

@@ -58,6 +58,29 @@ export type GoModels = {
   error?: string
 }
 
+export type LedgerTokens = {
+  input: number
+  output: number
+  reasoning: number
+  cache: { read: number; write: number }
+}
+
+export type LedgerModel = {
+  model: { id: string; providerID: string; variant?: string }
+  steps: number
+  tokens: LedgerTokens
+}
+
+export type LedgerDay = {
+  directory: string
+  date: string
+  steps: number
+  prompts: number
+  sessions: number
+  tokens: LedgerTokens
+  models: LedgerModel[]
+}
+
 const MeterSchema = {
   type: "object",
   properties: {
@@ -135,6 +158,61 @@ const ModelSchema = {
   additionalProperties: false,
 }
 
+const LedgerTokensSchema = {
+  type: "object",
+  properties: {
+    input: { type: "number" },
+    output: { type: "number" },
+    reasoning: { type: "number" },
+    cache: {
+      type: "object",
+      properties: {
+        read: { type: "number" },
+        write: { type: "number" },
+      },
+      required: ["read", "write"],
+      additionalProperties: false,
+    },
+  },
+  required: ["input", "output", "reasoning", "cache"],
+  additionalProperties: false,
+}
+
+const LedgerModelSchema = {
+  type: "object",
+  properties: {
+    model: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        providerID: { type: "string" },
+        variant: { type: "string" },
+      },
+      required: ["id", "providerID"],
+      additionalProperties: false,
+    },
+    steps: { type: "number" },
+    tokens: LedgerTokensSchema,
+  },
+  required: ["model", "steps", "tokens"],
+  additionalProperties: false,
+}
+
+const LedgerDaySchema = {
+  type: "object",
+  properties: {
+    directory: { type: "string" },
+    date: { type: "string" },
+    steps: { type: "number" },
+    prompts: { type: "number" },
+    sessions: { type: "number" },
+    tokens: LedgerTokensSchema,
+    models: { type: "array", items: LedgerModelSchema },
+  },
+  required: ["directory", "date", "steps", "prompts", "sessions", "tokens", "models"],
+  additionalProperties: false,
+}
+
 export const GoUsage = Rpc.define({
   id: "opencode-go-usage",
   methods: {
@@ -178,6 +256,42 @@ export const GoUsage = Rpc.define({
           error: { type: "string" },
         },
         required: ["fetchedAt", "models"],
+        additionalProperties: false,
+      },
+    },
+    ledger: {
+      input: {
+        type: "object",
+        properties: {
+          directory: { type: "string" },
+        },
+        additionalProperties: false,
+      },
+      output: {
+        type: "object",
+        properties: {
+          days: { type: "array", items: LedgerDaySchema },
+        },
+        required: ["days"],
+        additionalProperties: false,
+      },
+    },
+    backfill: {
+      input: {
+        type: "object",
+        properties: {
+          directory: { type: "string" },
+          days: { type: "array", items: LedgerDaySchema },
+        },
+        required: ["directory", "days"],
+        additionalProperties: false,
+      },
+      output: {
+        type: "object",
+        properties: {
+          added: { type: "number" },
+        },
+        required: ["added"],
         additionalProperties: false,
       },
     },
