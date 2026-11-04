@@ -165,6 +165,11 @@ export function createLedger(storage: Storage) {
     addTokens(day.tokens, tokens)
     if (sessionID && !day.sessions.includes(sessionID)) day.sessions.push(sessionID)
 
+    if (model.providerID === "unknown" || model.providerID === "internal") {
+      schedule()
+      return
+    }
+
     const key = `${model.providerID}/${model.id}`
     let entry = day.models.find((item) => `${item.model.providerID}/${item.model.id}` === key)
     if (!entry) {
@@ -193,6 +198,24 @@ export function createLedger(storage: Storage) {
       typeof event.location?.directory === "string" && event.location.directory
         ? event.location.directory
         : "unknown"
+
+    if (event.type === "session.created") {
+      const sessionID = data.sessionID
+      const model = data.model
+      if (
+        typeof sessionID === "string" &&
+        model &&
+        typeof model.id === "string" &&
+        typeof model.providerID === "string"
+      ) {
+        models.set(sessionID, {
+          id: model.id,
+          providerID: model.providerID,
+          ...(typeof model.variant === "string" ? { variant: model.variant } : {}),
+        })
+      }
+      return
+    }
 
     if (event.type === "session.model.selected") {
       const sessionID = data.sessionID
@@ -311,6 +334,14 @@ export function createLedger(storage: Storage) {
       existing.tokens.reasoning = Math.max(existing.tokens.reasoning, tokens.reasoning)
       existing.tokens.cache.read = Math.max(existing.tokens.cache.read, tokens.cache.read)
       existing.tokens.cache.write = Math.max(existing.tokens.cache.write, tokens.cache.write)
+
+      if (models.length > 0) {
+        const before = existing.models.length
+        existing.models = existing.models.filter(
+          (item) => item.model.providerID !== "unknown" && item.model.providerID !== "internal",
+        )
+        if (existing.models.length !== before) changed += 1
+      }
 
       for (const item of models) {
         const key = `${item.model.providerID}/${item.model.id}`

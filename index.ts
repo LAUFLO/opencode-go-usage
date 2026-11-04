@@ -378,7 +378,7 @@ export default Plugin.define({
     await ledger.load()
 
     try {
-      const sessions = await ctx.session.list({ limit: 100 })
+      const sessions = await ctx.session.list({ limit: 500 })
       const list = Array.isArray(sessions) ? sessions : (sessions as { data?: unknown })?.data
       if (Array.isArray(list)) {
         ledger.seed(
@@ -393,7 +393,7 @@ export default Plugin.define({
     void (async () => {
       try {
         for await (const event of ctx.event.subscribe({
-          types: ["session.step.ended", "session.model.selected", "session.usage.recorded"],
+          types: ["session.created", "session.step.ended", "session.model.selected", "session.usage.recorded"],
           signal: controller.signal,
         })) {
           ledger.handle(event)
